@@ -18,7 +18,7 @@ def get_file_information():
         print "rebuild vocabulary? (y/n)",
         build_vocab = raw_input()
     if vocab_input != "":
-        build_vocab = vocab_input == "y"
+        build_vocab = (vocab_input == "y")
     return image_dir, annotation_dir, build_vocab
 
 # input the vocab that contains the words, i.e index_to_word
@@ -27,6 +27,17 @@ def write_vocab_to_file(vocab):
     for word in vocab:
         vocab_file.write(word + "\n")
     vocab_file.close()
+
+def load_vocab():
+    vocab_file = open('vocab.txt', 'r')
+    index_to_word = vocab_file.read().splitlines()
+    vocab_file.close()
+    word_to_index = {}
+    index = 0
+    for word in index_to_word:
+        word_to_index[word] = index
+        index += 1
+    return index_to_word, word_to_index
 
 def load_data(images, annotations, transform):
     return datasets.CocoCaptions(root = images, annFile = annotations, transform = transform)

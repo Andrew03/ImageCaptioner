@@ -52,6 +52,6 @@ print('Number of samples: ', len(training_set))
 img, target = training_set[3]
 print("Image Size: ", img.size())
 print(target)
-
-word_to_index, index_to_word  = data_loader.create_vocab(training_set, min_occurrence=10)
-data_loader.write_vocab_to_file(index_to_word)
+word_to_index, index_to_word  = data_loader.create_vocab(training_set, min_occurrence=10) if build_vocab == True else (data_loader.load_vocab())
+if build_vocab == True:
+    data_loader.write_vocab_to_file(index_to_word)
