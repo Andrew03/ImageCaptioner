@@ -45,6 +45,26 @@ print(output)
 img2, tar2 = training_set[100]
 print(img2.size())
 
+
+print('Number of samples: ', len(training_set))
+img, target = training_set[3]
+print("Image Size: ", img.size())
+print(target)
+
+
+# rebuilds vocabulary if necessary or specified
+# otherwise, uses the already prebuilt vocabulary
+print("rebuilding vocabulary" if build_vocab == True else "using old vocabulary")
+word_to_index, index_to_word  = data_loader.create_vocab(training_set, min_occurrence=5) if build_vocab == True else (data_loader.load_vocab())
+# overwrites the prebuilt vocabulary if specified, otherwise stores the vocabulary
+if build_vocab == True:
+    data_loader.write_vocab_to_file(index_to_word)
+
+# CNN takes in image and passes feature vector to RNN once at time step -1
+# Then RNN takes in word at time step i and tries to make that word more probable 
+# What does it mean for the image and words to be mapped to the same space?
+# Does that mean we combine the image feature vector and the word vector?
+
 '''
 # creating the model
 batch_size, min_occurrences = 32, 10
@@ -55,20 +75,23 @@ loss_function = nn.NLLLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.1)
 '''
 
-# CNN takes in image and passes feature vector to RNN once at time step -1
-# Then RNN takes in word at time step i and tries to make that word more probable 
-# What does it mean for the image and words to be mapped to the same space?
-# Does that mean we combine the image feature vector and the word vector?
+'''
+for epoch in range(1000):
+    # resetting gradients and hidden layer values
+    mode.zero_grad()
+    mode.hidden = mode.init_hidden()
 
-print('Number of samples: ', len(training_set))
-img, target = training_set[3]
-print("Image Size: ", img.size())
-print(target)
+    images, captions = data_loader.create_batch(training_set, batch_size=batch_size, word_to_index)
+    input_captions = create_input_batch_captions(captions)
+    target_captions = create_target_batch_captions(captions)
+    
+    image_features = cnn_encoder(images)
+    input_images = create_input_batch_image_features(image_features, len(index_to_word))
+    
+    caption_scores = model(input_captions)
+    loss = loss_function(caption_scores, target_captions)
 
-# rebuilds vocabulary if necessary or specified
-# otherwise, uses the already prebuilt vocabulary
-print("rebuilding vocabulary" if build_vocab == True else "using old vocabulary")
-word_to_index, index_to_word  = data_loader.create_vocab(training_set, min_occurrence=5) if build_vocab == True else (data_loader.load_vocab())
-# overwrites the prebuilt vocabulary if specified, otherwise stores the vocabulary
-if build_vocab == True:
-    data_loader.write_vocab_to_file(index_to_word)
+    print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
+    loss.backward()
+    optimizer.step()
+'''

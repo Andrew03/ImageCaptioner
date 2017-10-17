@@ -3,6 +3,7 @@ import torch.autograd as autograd
 import torchvision.datasets as datasets
 import os.path
 import re
+from random import randint
 
 def get_file_information():
     image_dir = ""
@@ -21,6 +22,9 @@ def get_file_information():
             vocab_input = raw_input()
         build_vocab = (vocab_input == "y")
     return image_dir, annotation_dir, build_vocab
+
+def split_sentence(sentence):
+    return re.findall(r"[\w']+|[.,!?;]", sentence.lower())
 
 # input the vocab that contains the words, i.e index_to_word
 def write_vocab_to_file(vocab):
@@ -61,7 +65,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, end_va
         if iter_number % 1000 == 0 and iter_number > 999:
             print iter_number
         for sentence in captions:
-            for word in re.findall(r"[\w']+|[.,!?;]", sentence.lower()):
+            for word in split_sentence(sentence):
                 if word not in word_to_appearences:
                     word_to_appearences[word] = 0
                 word_to_appearences[word] += 1
@@ -70,3 +74,35 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, end_va
                     index_to_word.append(word)
         iter_number += 1
     return word_to_index, index_to_word
+
+'''
+returns images in a stored tensor, captions are just in a list, need to format to input or output manually
+'''
+def create_batch(training_set, batch_size=1, word_to_index, randomize=False):
+    images = []
+    captions = []
+    for _ in range(batch_size):
+        int randInt = randint(0, len(training_set) - 1)
+        image, caption = training_set[randInt]
+        images.append(image)
+        sentence = caption[0]
+        # inserting and appending start of string and end of string tags
+        sentence.insert(0, "SOS")
+        sentence.append("EOS")
+        captions.append([word_to_index[word] for word in split_sentence(sentence))
+    images = image_to_variable(torch.stack(images, 0))
+    return images, captions
+
+def create_input_batch_captions(captions):
+    return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() else autograd.Varaible(torch.LongTensor(captions))
+
+# need to enlargen them probably to match vocabulary length
+def create_input_batch_image_features(image_features, vocab_length):
+    return
+
+def create_target_batch_captions(captions):
+    targets = []
+    for caption in captions: 
+        for word_index in caption:
+            targets.append(word_index)
+    return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
