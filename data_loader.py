@@ -2,6 +2,7 @@ import torch
 import torch.autograd as autograd
 import torchvision.datasets as datasets
 import os.path
+import re
 
 def get_file_information():
     image_dir = ""
@@ -60,7 +61,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, end_va
         if iter_number % 1000 == 0 and iter_number > 999:
             print iter_number
         for sentence in captions:
-            for word in sentence.lower().split():
+            for word in re.findall(r"[\w']+|[.,!?;]", sentence.lower()):
                 if word not in word_to_appearences:
                     word_to_appearences[word] = 0
                 word_to_appearences[word] += 1
