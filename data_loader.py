@@ -13,11 +13,11 @@ def get_file_information():
         print "annotation directory:",
         annotation_dir = raw_input()
     build_vocab = os.path.isfile("vocab.txt") == False
-    vocab_input = ""
-    while build_vocab == False and vocab_input != "y" and vocab_input != "n":
-        print "rebuild vocabulary? (y/n)",
-        build_vocab = raw_input()
-    if vocab_input != "":
+    if build_vocab == False:
+        vocab_input = ""
+        while vocab_input != "y" and vocab_input != "n":
+            print "rebuild vocabulary? (y/n)",
+            vocab_input = raw_input()
         build_vocab = (vocab_input == "y")
     return image_dir, annotation_dir, build_vocab
 
@@ -37,7 +37,7 @@ def load_vocab():
     for word in index_to_word:
         word_to_index[word] = index
         index += 1
-    return index_to_word, word_to_index
+    return word_to_index, index_to_word
 
 def load_data(images, annotations, transform):
     return datasets.CocoCaptions(root = images, annFile = annotations, transform = transform)
@@ -60,7 +60,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, end_va
         if iter_number % 1000 == 0 and iter_number > 999:
             print iter_number
         for sentence in captions:
-            for word in sentence.split():
+            for word in sentence.lower().split():
                 if word not in word_to_appearences:
                     word_to_appearences[word] = 0
                 word_to_appearences[word] += 1

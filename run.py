@@ -9,9 +9,6 @@ import sys
 import data_loader
 from lstm import LSTM
 
-def to_var(x):
-    return autograd.Variable(x.cuda())
-
 # defining image size
 transform = transforms.Compose([
     transforms.Scale(256),
@@ -26,17 +23,27 @@ image_dir, annotation_dir, build_vocab = data_loader.get_file_information()
 # training_set = data_loader.load_data(images='data/train2014', annotations='data/captions_train2014.json', transform=transform)
 training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
 
-cnn_encoder = models.vgg16(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16(pretrained=True))
-image, target = training_set[3]
+# CNN is vgg16 with batch normalization
+# Doesn't seem like vgg16 with batch normalization works right now... might be me needing to update pytorch
+# cnn_encoder = models.vgg16_bn(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16_bn(pretrained=True))
+#cnn_encoder = models.vgg16(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16(pretrained=True))
+# think this is an easier way of using cuda when available but should check
+cnn_encoder = models.vgg16(pretrained=True)
+if (torch.cuda.is_available()):
+    cnn_encoder.cuda()
+batch_size = 30
 images = []
-images.append(image)
+for i in range(batch_size):
+    image, target = training_set[3]
+    images.append(image)
 images = torch.stack(images, 0)
 print(images.size())
-# output is a feature vector of size 1000
-print(cnn_encoder(data_loader.image_to_variable(images)))
+# output is a Variable containing batch_size feature vectors of size 1000
+output = cnn_encoder(data_loader.image_to_variable(images))
+print(len(output))
+print(output)
 img2, tar2 = training_set[100]
 print(img2.size())
-#print(cnn_encoder(to_var(images)))
 
 '''
 # creating the model
@@ -48,10 +55,20 @@ loss_function = nn.NLLLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.1)
 '''
 
+# CNN takes in image and passes feature vector to RNN once at time step -1
+# Then RNN takes in word at time step i and tries to make that word more probable 
+# What does it mean for the image and words to be mapped to the same space?
+# Does that mean we combine the image feature vector and the word vector?
+
 print('Number of samples: ', len(training_set))
 img, target = training_set[3]
 print("Image Size: ", img.size())
 print(target)
-word_to_index, index_to_word  = data_loader.create_vocab(training_set, min_occurrence=10) if build_vocab == True else (data_loader.load_vocab())
+
+# rebuilds vocabulary if necessary or specified
+# otherwise, uses the already prebuilt vocabulary
+print("rebuilding vocabulary" if build_vocab == True else "using old vocabulary")
+word_to_index, index_to_word  = data_loader.create_vocab(training_set, min_occurrence=5) if build_vocab == True else (data_loader.load_vocab())
+# overwrites the prebuilt vocabulary if specified, otherwise stores the vocabulary
 if build_vocab == True:
     data_loader.write_vocab_to_file(index_to_word)
