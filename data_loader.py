@@ -3,7 +3,14 @@ import torch.autograd as autograd
 import torchvision.datasets as datasets
 import os.path
 import re
+import json
 from random import randint
+
+def load_image_information(path):
+    json_data = {}
+    with open(path) as f:
+        json_data = json.load(f)
+    return json_data['images']
 
 def get_file_information():
     image_dir = ""
@@ -78,18 +85,18 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, end_va
 '''
 returns images in a stored tensor, captions are just in a list, need to format to input or output manually
 '''
-def create_batch(training_set, batch_size=1, word_to_index, randomize=False):
+def create_batch(training_set, word_to_index, batch_size=1, randomize=False):
     images = []
     captions = []
     for _ in range(batch_size):
-        int randInt = randint(0, len(training_set) - 1)
+        randInt = randint(0, len(training_set) - 1)
         image, caption = training_set[randInt]
         images.append(image)
         sentence = caption[0]
         # inserting and appending start of string and end of string tags
         sentence.insert(0, "SOS")
         sentence.append("EOS")
-        captions.append([word_to_index[word] for word in split_sentence(sentence))
+        captions.append([word_to_index[word] for word in split_sentence(sentence)])
     images = image_to_variable(torch.stack(images, 0))
     return images, captions
 
