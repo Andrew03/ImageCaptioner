@@ -1,4 +1,6 @@
 UNK
+SOS
+EOS
 market
 .
 of

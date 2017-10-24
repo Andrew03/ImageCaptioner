@@ -22,7 +22,7 @@ class LSTM(nn.Module):
     def forward(self, sentence):
         embed_value = self.embedding_layer(sentence)
         lstm_out, self.hidden = self.lstm(
-            embed_value.view(-1, len(sentence), self.embedding_dim), self.hidde )
+            embed_value.view(-1, len(sentence), self.embedding_dim), self.hidden )
         words_space = self.hidden2word(lstm_out.view(-1, self.hidden_dim))
         words_score = F.log_softmax(words_space)
         return words_score
