@@ -3,7 +3,14 @@ import torch.autograd as autograd
 import torchvision.datasets as datasets
 import os.path
 import re
+import json
 from random import randint
+
+def load_image_information(path):
+    json_data = {}
+    with open(path) as f:
+        json_data = json.load(f)
+    return json_data['images']
 
 def get_file_information():
     image_dir = ""
