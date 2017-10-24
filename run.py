@@ -20,7 +20,21 @@ transform = transforms.Compose([
         std=[0.229, 0.224, 0.225])
 ])
 
-image_dir, annotation_dir, build_vocab = data_loader.get_file_information()
+image_dir = ""
+annotation_dir = ""
+build_vocab = False
+if len(sys.argv) == 1:
+    image_dir, annotation_dir, build_vocab = data_loader.get_file_information()
+elif len(sys.argv) < 3:
+    print("Include image data set and caption data set")
+    sys.exit()
+else:
+    image_dir = sys.argv[1]
+    annotation_dir = sys.argv[2]
+    if len(sys.argv) > 3:
+        build_vocab = True
+    
+
 # training_set = data_loader.load_data(images='data/train2014', annotations='data/captions_train2014.json', transform=transform)
 training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
 
@@ -55,35 +69,30 @@ if build_vocab == True:
 # What does it mean for the image and words to be mapped to the same space?
 # Does that mean we combine the image feature vector and the word vector?
 
-embed_dim = 32
-encoder_cnn = EncoderCNN(embed_dim)
-# output is a Variable containing batch_size feature vectors of size 1000
-input = data_loader.image_to_variable(images)
-output = encoder_cnn(input)
-print(output)
-
-'''
 # creating the model
 batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 30, 100,30
-#model = LSTM(D_embed, H, len(word_to_index), batch_size).cuda() if torch.cuda.is_available() else LSTM(D_embed, H, len(word_to_index), batch_size)
-model = LSTM(D_embed, H, 1000, batch_size).cuda() if torch.cuda.is_available() else LSTM(D_embed, H, 1000, batch_size)
-loss_function = nn.NLLLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.1)
-'''
+D_embed, H, D_out = 32, 100,30
 
-'''
+encoder_cnn = EncoderCNN(D_embed)
+model = LSTM(D_embed, H, len(word_to_index), batch_size).cuda() if torch.cuda.is_available() else LSTM(D_embed, H, len(word_to_index), batch_size)
+if torch.cuda.is_available():
+    model.cuda()
+loss_function = nn.NLLLoss()
+# try using adams
+#optimizer = optim.SGD(model.parameters(), lr=0.1)
+optimizer = optim.Adam(model.parameters(), lr=0.1)
+
 for epoch in range(1000):
     # resetting gradients and hidden layer values
-    mode.zero_grad()
-    mode.hidden = mode.init_hidden()
+    model.zero_grad()
+    model.hidden = model.init_hidden()
 
-    images, captions = data_loader.create_batch(training_set, batch_size=batch_size, word_to_index)
-    input_captions = create_input_batch_captions(captions)
-    target_captions = create_target_batch_captions(captions)
+    images, captions = data_loader.create_batch(training_set, word_to_index, 5, batch_size=batch_size)
+    input_captions = data_loader.create_input_batch_captions(captions)
+    target_captions = data_loader.create_target_batch_captions(captions)
     
-    image_features = cnn_encoder(images)
-    input_images = create_input_batch_image_features(image_features, len(index_to_word))
+    image_features = encoder_cnn(images)
+    input_images = data_loader.create_input_batch_image_features(image_features, D_embed)
     
     caption_scores = model(input_captions)
     loss = loss_function(caption_scores, target_captions)
@@ -91,4 +100,3 @@ for epoch in range(1000):
     print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
     loss.backward()
     optimizer.step()
-'''
