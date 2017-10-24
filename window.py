@@ -1,41 +1,39 @@
 from Tkinter import *
 from PIL import ImageTk, Image
 import tkMessageBox
-import data_loader
-import torchvision.transforms as transforms
-
-def generate_button_callback():
-    tkMessageBox.showinfo( "Hello Python", "Hello World")
-
-def get_image(image_str, image_data, top):
-    image_index = int(image_str)
-    image_path = image_data[image_index]['file_name']
-    img = ImageTk.PhotoImage(Image.open("data/train2014/" + image_path))
-    panel = Label(top, image = img)
-    panel.pack(side = "bottom", fill = "both", expand = "yes")
-    tkMessageBox.showinfo("", image_str)
-
-transform = transforms.Compose([
-    transforms.Scale(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225])
-])
+from pycocotools.coco import COCO
 
 top = Tk()
-training_set = data_loader.load_data(images='data/training2014', annotations='data/captions_train2014.json', transform=transform)
-image_data = data_loader.load_image_information('data/instances_train2014.json')
-print("finished loading json")
+top.minsize(width=650, height=650)
+coco=COCO('data/captions_train2014.json')
 
-generate_button = Button(top, text ="Generate a caption!", command = generate_button_callback)
-generate_button.pack()
-L1 = Label(top, text="Image Name")
-L1.pack(side = LEFT)
 E1 = Entry(top, bd = 5)
-get_image_button = Button(top, text="get image", command = lambda: get_image(E1.get(), image_data, top))
-get_image_button.pack()
+E1.pack()
+get_image_button = Button(top, text="get image(0 - " + str(len(coco.imgs) - 1) + ")", command = lambda: get_image(E1.get())).pack()
+captions = "captions will appear here"
+image_captions = Label(top, text=captions)
+image_captions.pack()
+image = ImageTk.PhotoImage(file="assets/temp.png")
+panel = Label(top, image = image)
+panel.pack(side = "bottom", fill = "both", expand = "yes")
 
-E1.pack(side = RIGHT)
-# displays the window
+# Getting an image index is not intuitive! 
+# It doesn't seem to be ordered the same way that it is in the generic load
+def get_image(image_str):
+    set_index = int(image_str)
+    set_id = coco.imgs.keys()[set_index]
+    image_path = coco.imgs[set_id]['file_name']
+    annIds = coco.getAnnIds(imgIds=coco.imgs[set_id]['id'])
+    captions = coco.loadAnns(annIds)
+    image = Image.open("data/train2014/" + image_path)
+    image = image.resize((400, 400), Image.ANTIALIAS)
+    image = ImageTk.PhotoImage(image)
+
+    panel.configure(image = image)
+    panel.image = image
+    caption_string = ""
+    for string in captions:
+        caption_string += string['caption'] + "\n"
+    image_captions.configure(text=caption_string)
+
 top.mainloop()
