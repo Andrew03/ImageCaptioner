@@ -76,8 +76,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, end_va
     return word_to_index, index_to_word
 
 '''
-returns images in a stored tensor, captions are just in a list, need to format to input or output manually
-'''
+# returns images in a stored tensor, captions are just in a list, need to format to input or output manually
 def create_batch(training_set, batch_size=1, word_to_index, randomize=False):
     images = []
     captions = []
@@ -106,3 +105,4 @@ def create_target_batch_captions(captions):
         for word_index in caption:
             targets.append(word_index)
     return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
+'''

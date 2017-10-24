@@ -8,6 +8,7 @@ import torchvision.models as models
 import sys
 import data_loader
 from lstm import LSTM
+from encoder import EncoderCNN
 
 # defining image size
 transform = transforms.Compose([
@@ -28,9 +29,6 @@ training_set = data_loader.load_data(images=image_dir, annotations=annotation_di
 # cnn_encoder = models.vgg16_bn(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16_bn(pretrained=True))
 #cnn_encoder = models.vgg16(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16(pretrained=True))
 # think this is an easier way of using cuda when available but should check
-cnn_encoder = models.vgg16(pretrained=True)
-if (torch.cuda.is_available()):
-    cnn_encoder.cuda()
 batch_size = 30
 images = []
 for i in range(batch_size):
@@ -38,19 +36,11 @@ for i in range(batch_size):
     images.append(image)
 images = torch.stack(images, 0)
 print(images.size())
-# output is a Variable containing batch_size feature vectors of size 1000
-output = cnn_encoder(data_loader.image_to_variable(images))
-print(len(output))
-print(output)
-img2, tar2 = training_set[100]
-print(img2.size())
-
 
 print('Number of samples: ', len(training_set))
 img, target = training_set[3]
 print("Image Size: ", img.size())
 print(target)
-
 
 # rebuilds vocabulary if necessary or specified
 # otherwise, uses the already prebuilt vocabulary
@@ -64,6 +54,13 @@ if build_vocab == True:
 # Then RNN takes in word at time step i and tries to make that word more probable 
 # What does it mean for the image and words to be mapped to the same space?
 # Does that mean we combine the image feature vector and the word vector?
+
+embed_dim = 32
+encoder_cnn = EncoderCNN(embed_dim)
+# output is a Variable containing batch_size feature vectors of size 1000
+input = data_loader.image_to_variable(images)
+output = encoder_cnn(input)
+print(output)
 
 '''
 # creating the model
