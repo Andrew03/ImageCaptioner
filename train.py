@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision.transforms as transforms
+import torch.autograd as autograd
 import torchvision.models as models
 import sys
 import data_loader
@@ -74,18 +75,20 @@ batch_size, min_occurrences = 32, 10
 D_embed, H, D_out = 32, 100,30
 
 encoder_cnn = EncoderCNN(D_embed)
-model = LSTM(D_embed, H, len(word_to_index), batch_size).cuda() if torch.cuda.is_available() else LSTM(D_embed, H, len(word_to_index), batch_size)
+model = LSTM(D_embed, H, len(word_to_index), batch_size)
 feature_mapping = nn.Linear(4096, D_embed)
+caption_embedding = nn.Embedding(len(word_to_index), D_embed)
 if torch.cuda.is_available():
     model.cuda()
     feature_mapping.cuda()
+    caption_embedding.cuda()
 loss_function = nn.NLLLoss()
 # try using adams
 #optimizer = optim.SGD(model.parameters(), lr=0.1)
 optimizer = optim.Adam(model.parameters(), lr=0.1)
 optimizer_encoder = optim.Adam(feature_mapping.parameters(), lr=0.1)
 
-for epoch in range(1000):
+for epoch in range(10000):
     # resetting gradients and hidden layer values
     model.zero_grad()
     model.hidden = model.init_hidden()
@@ -96,11 +99,13 @@ for epoch in range(1000):
     
     input_images = data_loader.create_input_batch_image_features(images, D_embed)
     image_features = encoder_cnn(input_images)
-    image_features = feature_mapping(image_features)
+    image_features = autograd.Variable(feature_mapping(image_features).data)
     initial_score = model(image_features)
-    loss = loss_function(initial_scores, [word_to_index["SOS"] for _ in range(batch_size)])
+    loss = loss_function(initial_score, data_loader.create_target_batch_captions([[word_to_index["SOS"]] for _ in range(batch_size)]))
     
-    caption_scores = model(input_captions)
+    caption_features = autograd.Variable(caption_embedding(input_captions).data)
+    #caption_scores = model(input_captions)
+    caption_scores = model(caption_features)
     loss = loss_function(caption_scores, target_captions)
 
     print(str(loss.data.select(0, 0) / batch_size))
@@ -108,3 +113,6 @@ for epoch in range(1000):
     loss.backward()
     optimizer.step()
     optimizer_encoder.step()
+torch.save(model.state_dict(), 'model.pt')
+torch.save(feature_mapping.state_dict(), 'feature_mapping.pt')
+torch.save(caption_embedding.state_dict(), 'caption_embedding.pt')
