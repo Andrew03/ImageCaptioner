@@ -25,4 +25,4 @@ class LSTM(nn.Module):
             sentence.view(-1, len(sentence), self.embedding_dim), self.hidden )
         words_space = self.hidden2word(lstm_out.view(-1, self.hidden_dim))
         words_score = F.log_softmax(words_space)
-        return words_score
+        return words_score, words_space

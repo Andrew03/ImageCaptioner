@@ -37,20 +37,13 @@ else:
     
 
 # training_set = data_loader.load_data(images='data/train2014', annotations='data/captions_train2014.json', transform=transform)
-training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
+training_set, grouped_training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform, batch_size=32)
 
 # CNN is vgg16 with batch normalization
 # Doesn't seem like vgg16 with batch normalization works right now... might be me needing to update pytorch
 # cnn_encoder = models.vgg16_bn(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16_bn(pretrained=True))
 #cnn_encoder = models.vgg16(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16(pretrained=True))
 # think this is an easier way of using cuda when available but should check
-batch_size = 30
-images = []
-for i in range(batch_size):
-    image, target = training_set[3]
-    images.append(image)
-images = torch.stack(images, 0)
-#print(images.size())
 
 #print('Number of samples: ', len(training_set))
 #img, target = training_set[3]
@@ -93,19 +86,19 @@ for epoch in range(10000):
     model.zero_grad()
     model.hidden = model.init_hidden()
 
-    images, captions = data_loader.create_batch(training_set, word_to_index, 5, batch_size=batch_size)
+    images, captions = data_loader.create_batch(training_set, grouped_training_set, word_to_index, 5, batch_size=batch_size)
     input_captions = data_loader.create_input_batch_captions(captions)
     target_captions = data_loader.create_target_batch_captions(captions)
     
     input_images = data_loader.create_input_batch_image_features(images, D_embed)
     image_features = encoder_cnn(input_images)
     image_features = autograd.Variable(feature_mapping(image_features).data)
-    initial_score = model(image_features)
+    initial_score, _ = model(image_features)
     loss = loss_function(initial_score, data_loader.create_target_batch_captions([[word_to_index["SOS"]] for _ in range(batch_size)]))
     
     caption_features = autograd.Variable(caption_embedding(input_captions).data)
     #caption_scores = model(input_captions)
-    caption_scores = model(caption_features)
+    caption_scores, _ = model(caption_features)
     loss = loss_function(caption_scores, target_captions)
 
     print(str(loss.data.select(0, 0) / batch_size))
@@ -113,6 +106,6 @@ for epoch in range(10000):
     loss.backward()
     optimizer.step()
     optimizer_encoder.step()
-torch.save(model.state_dict(), 'model.pt')
-torch.save(feature_mapping.state_dict(), 'feature_mapping.pt')
-torch.save(caption_embedding.state_dict(), 'caption_embedding.pt')
+torch.save(model.state_dict(), 'model/model.pt')
+torch.save(feature_mapping.state_dict(), 'model/feature_mapping.pt')
+torch.save(caption_embedding.state_dict(), 'model/caption_embedding.pt')

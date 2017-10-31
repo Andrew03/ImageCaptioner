@@ -4,6 +4,7 @@ import torchvision.datasets as datasets
 import os.path
 import re
 import json
+import random
 from random import randint
 
 def load_image_information(path):
@@ -51,7 +52,48 @@ def load_vocab():
         index += 1
     return word_to_index, index_to_word
 
-def load_data(images, annotations, transform):
+def load_data(images, annotations, transform, batch_size=1):
+    data_set =  datasets.CocoCaptions(root = images, annFile = annotations, transform = transform)
+    training_set = {}
+    if os.path.isfile('training_set.txt') == True:
+        data_file = open('training_set.txt', 'r')
+        num_keys = int(data_file.readline())
+        for _ in range(0, num_keys):
+            print ("index " + str(_) + " out of " + str(num_keys))
+            key = int(data_file.readline())
+            num_caps = int(data_file.readline())
+            training_set[key] = []
+            for _ in range(0, num_caps):
+                image = int(data_file.readline())
+                caption = data_file.readline()
+                caption = caption[1:]
+                caption = caption[:-1]
+                caption = caption.split(", ")
+                training_set[key].append([image, caption])
+    for i in range(len(data_set)):
+        image, captions = data_set[i]
+        for caption in captions:
+            sentence = split_sentence(caption)
+            sentence.insert(0, "SOS")
+            sentence.append("EOS")
+            if len(sentence) not in training_set.keys():
+                training_set[len(sentence)] = []
+            training_set[len(sentence)].append([i, sentence])
+    for i in training_set.keys():
+        if len(training_set[i]) < batch_size:
+            del training_set[i]
+    data_file = open('training_set.txt', 'w')
+    data_file.write(str(len(training_set))+ "\n")
+    for key in training_set.keys():
+        data_file.write(str(key)+ "\n")
+        data_file.write(str(len(training_set[key])) + "\n")
+        for image, sentence in training_set[key]:
+            data_file.write(str(image) + "\n")
+            data_file.write(str(sentence) + "\n")
+    data_file.close()
+    return data_set, training_set
+
+def load_data_ungrouped(images, annotations, transform, batch_size=1):
     return datasets.CocoCaptions(root = images, annFile = annotations, transform = transform)
 
 # Needs an array of images
@@ -86,8 +128,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_
         iter_number += 1
     return word_to_index, index_to_word
 
-# returns images in a stored tensor, captions are just in a list, need to format to input or output manually
-def create_batch(training_set, word_to_index, num_captions, batch_size=1, randomize=False):
+def create_val_batch(training_set, word_to_index, num_captions, batch_size=1, randomize=False):
     images = []
     captions = []
     max_length = 0
@@ -105,6 +146,21 @@ def create_batch(training_set, word_to_index, num_captions, batch_size=1, random
     for _ in range(batch_size):
         while len(captions[_]) < max_length:
             captions[_].append(get_index("EOS", word_to_index))
+    images = image_to_variable(torch.stack(images, 0))
+    return images, captions
+
+# returns images in a stored tensor, captions are just in a list, need to format to input or output manually
+def create_batch(image_set, grouped_training_set, word_to_index, num_captions, batch_size=1, randomize=False):
+    images = []
+    captions = []
+    training_set_index = random.choice(grouped_training_set.keys())
+    data_set = grouped_training_set[training_set_index]
+    random.shuffle(data_set)
+    image_caption_set = data_set[0:32]
+    for image_caption in image_caption_set:
+        image, _ = image_set[image_caption[0]]
+        images.append(image)
+        captions.append([get_index(word, word_to_index) for word in image_caption[1]])
     images = image_to_variable(torch.stack(images, 0))
     return images, captions
 
