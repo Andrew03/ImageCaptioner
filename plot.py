@@ -21,6 +21,7 @@ elif len(sys.argv) == 2:
       else: 
         val_loss.append(str(line))
         val_trial.append(trial_number)
+      index = index + 1
 plt.plot(train_trial, train_loss, 'ro')
 plt.plot(val_trial, val_loss, 'bo')
 plt.xlabel('trials')
