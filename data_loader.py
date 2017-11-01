@@ -110,8 +110,8 @@ def write_batched_data(batched_data, file_name):
 
 def batch_data(data_set, word_to_index, batch_size=1):
   batched_set = {}
-  #for i in range(len(data_set)):
-  for i in range(1000):
+  for i in range(len(data_set)):
+    #for i in range(1000):
     image, captions = data_set[i]
     for caption in captions:
       sentence = split_sentence(caption)
