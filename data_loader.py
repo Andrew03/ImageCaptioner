@@ -110,7 +110,8 @@ def write_batched_data(batched_data, file_name):
 
 def batch_data(data_set, word_to_index, batch_size=1):
   batched_set = {}
-  for i in range(len(data_set)):
+  #for i in range(len(data_set)):
+  for i in range(1000):
     image, captions = data_set[i]
     for caption in captions:
       sentence = split_sentence(caption)
@@ -169,14 +170,19 @@ def create_batch(image_set, batched_data, word_to_index, num_captions, batch_siz
   images = image_to_variable(torch.stack(images, 0))
   return images, captions
 
+# remember to take EOS token from input
 def create_input_batch_captions(captions):
-  return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(captions))
+  inputs = []
+  for caption in captions:
+    inputs.append(caption[:-1])
+  return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(inputs))
 
 # targets are a long vector, flatten them out
+# remember to take SOS token from targets
 def create_target_batch_captions(captions):
   targets = []
   for caption in captions: 
-    for word_index in caption:
+    for word_index in caption[1:]:
       targets.append(word_index)
   return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
 

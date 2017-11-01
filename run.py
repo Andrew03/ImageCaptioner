@@ -49,9 +49,9 @@ if torch.cuda.is_available():
     model.cuda()
     feature_mapping.cuda()
     caption_embedding.cuda()
-model.load_state_dict(torch.load('model/model.pt'))
-feature_mapping.load_state_dict(torch.load('model/feature_mapping.pt'))
-caption_embedding.load_state_dict(torch.load('model/caption_embedding.pt'))
+model.load_state_dict(torch.load('model/model2.pt'))
+feature_mapping.load_state_dict(torch.load('model/feature_mapping2.pt'))
+caption_embedding.load_state_dict(torch.load('model/caption_embedding2.pt'))
 loss_function = nn.NLLLoss()
 initial_word = ""
 for epoch in range(1):
@@ -67,24 +67,25 @@ for epoch in range(1):
             target_caption += index_to_word[word_index] + " "
 
     image_features = encoder_cnn(images)
-    image_features = feature_mapping(image_features)
-    initial_score, initial_word_space = model(image_features)
+    #image_features = feature_mapping(image_features)
+    #initial_score, initial_word_space = model(image_features)
+    initial_score = model(image_features)
     sentence = ""
     index = 0
-    word_spaces = []
-    input_batch = data_loader.create_input_batch_captions([[2] for _ in range(batch_size)])
-    input_features = caption_embedding(input_batch)
-    initial_score, initial_word_space = model(input_features)
-    best_score, best_index = initial_word_space.data[0].max(0)
+    input_batch = data_loader.create_input_batch_captions([[1,0] for _ in range(batch_size)])
+    #input_features = caption_embedding(input_batch)
+    #initial_score, initial_word_space = model(input_features)
+    initial_score = model(input_batch)
+    best_score, best_index = initial_score.data[0].max(0)
     best_word = index_to_word[best_index[0]]
-    while index < 10:
+    while index < 18 and best_word != "EOS":
         sentence += best_word + " "
-        input_batch = data_loader.create_input_batch_captions([[best_index[0]] for _ in range(batch_size)])
-        input_features = caption_embedding(input_batch)
-        initial_score, initial_word_space = model(input_features)
-        best_score, best_index = initial_word_space.data[0].max(0)
+        input_batch = data_loader.create_input_batch_captions([[best_index[0], 0] for _ in range(batch_size)])
+        #input_features = caption_embedding(input_batch)
+        #initial_score, initial_word_space = model(input_features)
+        initial_score = model(input_batch)
+        best_score, best_index = initial_score.data[0].max(0)
         best_word = index_to_word[best_index[0]]
-        word_spaces.append(initial_word_space)
         print(sentence)
         index += 1
     print(captions[0])

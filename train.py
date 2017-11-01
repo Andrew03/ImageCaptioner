@@ -51,6 +51,9 @@ if build_vocab == True:
 # batch the data
 #batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=32)
 #batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=32)
+batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=32)
+batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=32)
+'''
 batched_train_set = data_loader.load_batched_data('batched_train_set.txt', word_to_index)
 batched_val_set = data_loader.load_batched_data('batched_val_set.txt', word_to_index)
 if batched_train_set == None:
@@ -59,6 +62,7 @@ if batched_train_set == None:
 if batched_val_set == None:
   batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=32)
   data_loader.write_batched_data(batched_val_set, file_name="batched_val_set.txt")
+'''
 
 # CNN is vgg16 with batch normalization
 # Doesn't seem like vgg16 with batch normalization works right now... might be me needing to update pytorch
@@ -95,7 +99,7 @@ loss_function = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 optimizer_encoder = optim.Adam(feature_mapping.parameters(), lr=0.001)
 
-for epoch in range(5000):
+for epoch in range(1000):
   # resetting gradients and hidden layer values
   model.zero_grad()
   model.hidden = model.init_hidden()
@@ -111,13 +115,18 @@ for epoch in range(5000):
 
   # training
   train_image_features = encoder_cnn(train_images)
-  train_image_features = autograd.Variable(feature_mapping(train_image_features).data)
+  #train_image_features = autograd.Variable(feature_mapping(train_image_features).data)
+  train_image_features = autograd.Variable(train_image_features.data)
   # are these two lines really doing anything?
-  initial_score, _ = model(train_image_features)
-  loss = loss_function(initial_score, data_loader.create_target_batch_captions([[word_to_index["SOS"]] for _ in range(batch_size)]))
+  # probably don't need the second vriabl
+  initial_score = model(train_image_features)
+  #loss = loss_function(initial_score, data_loader.create_target_batch_captions([[word_to_index["SOS"]] for _ in range(batch_size)]))
+  #print(initial_score)
   
-  train_caption_features = autograd.Variable(caption_embedding(train_input_captions).data)
-  train_caption_scores, _ = model(train_caption_features)
+  #train_caption_features = autograd.Variable(caption_embedding(train_input_captions).data)
+  #train_caption_scores = model(train_caption_features)
+  #print(train_caption_scores)
+  train_caption_scores = model(train_input_captions)
   loss = loss_function(train_caption_scores, train_target_captions)
 
   print(str(loss.data.select(0, 0) / batch_size))
@@ -126,6 +135,7 @@ for epoch in range(5000):
   optimizer.step()
   optimizer_encoder.step()
 
+  '''
   # validating
   val_image_features = encoder_cnn(val_images)
   val_image_features = autograd.Variable(feature_mapping(val_image_features).data)
@@ -138,6 +148,7 @@ for epoch in range(5000):
   loss = loss_function(val_caption_scores, val_target_captions)
   print(str(loss.data.select(0, 0) / batch_size))
   print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
-torch.save(model.state_dict(), 'model/model.pt')
-torch.save(feature_mapping.state_dict(), 'model/feature_mapping.pt')
-torch.save(caption_embedding.state_dict(), 'model/caption_embedding.pt')
+  '''
+torch.save(model.state_dict(), 'model/model2.pt')
+torch.save(feature_mapping.state_dict(), 'model/feature_mapping2.pt')
+torch.save(caption_embedding.state_dict(), 'model/caption_embedding2.pt')
