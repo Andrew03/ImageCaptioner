@@ -30,9 +30,9 @@ else:
     image_dir = sys.argv[1]
     annotation_dir = sys.argv[2]
 
-training_set = data_loader.load_data_ungrouped(images=image_dir, annotations=annotation_dir, transform=transform)
+training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
 
-batch_size = 30
+batch_size = 32
 images = []
 
 print("using old vocabulary")
@@ -66,8 +66,7 @@ for epoch in range(1):
         elif word_index != 2:
             target_caption += index_to_word[word_index] + " "
 
-    input_images = data_loader.create_input_batch_image_features(images, D_embed)
-    image_features = encoder_cnn(input_images)
+    image_features = encoder_cnn(images)
     image_features = feature_mapping(image_features)
     initial_score, initial_word_space = model(image_features)
     sentence = ""
