@@ -79,29 +79,23 @@ if batched_val_set == None:
 
 # creating the model
 batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 32, 100,30
+D_embed, H, D_out = 32, 124,32
 
 encoder_cnn = EncoderCNN(D_embed)
 model = LSTM(D_embed, H, len(word_to_index), batch_size)
-feature_mapping = nn.Linear(4096, D_embed)
-caption_embedding = nn.Embedding(len(word_to_index), D_embed)
 if torch.cuda.is_available():
   model.cuda()
-  feature_mapping.cuda()
-  caption_embedding.cuda()
 loss_function = nn.NLLLoss()
-# try using adams
-#optimizer = optim.SGD(model.parameters(), lr=0.1)
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-optimizer_encoder = optim.Adam(feature_mapping.parameters(), lr=0.001)
+# tried using 0.001
+optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
 record_error = False
 if len(sys.argv) > 1:
   record_error = True
 
-error_file = open(sys.argv[1], 'w')
+error_file = open(sys.argv[1], 'w') if record_error == True else None
 
-for epoch in range(10000):
+for epoch in range(5000):
   # resetting gradients and hidden layer values
   model.zero_grad()
   model.hidden = model.init_hidden()
@@ -117,17 +111,10 @@ for epoch in range(10000):
 
   # training
   train_image_features = encoder_cnn(train_images)
-  #train_image_features = autograd.Variable(feature_mapping(train_image_features).data)
   train_image_features = autograd.Variable(train_image_features.data)
-  # are these two lines really doing anything?
-  # probably don't need the second vriabl
+  # do i need to store initial score?
   initial_score = model(train_image_features)
-  #loss = loss_function(initial_score, data_loader.create_target_batch_captions([[word_to_index["SOS"]] for _ in range(batch_size)]))
-  #print(initial_score)
   
-  #train_caption_features = autograd.Variable(caption_embedding(train_input_captions).data)
-  #train_caption_scores = model(train_caption_features)
-  #print(train_caption_scores)
   train_caption_scores = model(train_input_captions)
   loss = loss_function(train_caption_scores, train_target_captions)
 
@@ -137,17 +124,13 @@ for epoch in range(10000):
   print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
   loss.backward()
   optimizer.step()
-  optimizer_encoder.step()
 
+  model.hidden = model.init_hidden()
   # validating
   val_image_features = encoder_cnn(val_images)
-  #val_image_features = autograd.Variable(feature_mapping(val_image_features).data)
-  # are these two lines really doing anything?
+  # do i need to store initial score?
   initial_score = model(val_image_features)
-  #loss = loss_function(initial_score, data_loader.create_target_batch_captions([[word_to_index["SOS"]] for _ in range(batch_size)]))
   
-  #val_caption_features = autograd.Variable(caption_embedding(val_input_captions).data)
-  #val_caption_scores, _ = model(val_caption_features)
   val_caption_scores = model(val_input_captions)
   loss = loss_function(val_caption_scores, val_target_captions)
   if record_error == True:
@@ -155,6 +138,4 @@ for epoch in range(10000):
   #print(str(loss.data.select(0, 0) / batch_size))
   print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
 error_file.close()
-torch.save(model.state_dict(), 'model/model2.pt')
-torch.save(feature_mapping.state_dict(), 'model/feature_mapping2.pt')
-torch.save(caption_embedding.state_dict(), 'model/caption_embedding2.pt')
+torch.save(model.state_dict(), 'model/model5.01.pt')

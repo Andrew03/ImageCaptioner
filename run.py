@@ -39,19 +39,13 @@ print("using old vocabulary")
 word_to_index, index_to_word = data_loader.load_vocab()
 
 batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 32, 100, 30
+D_embed, H, D_out = 32, 124, 32
 
 encoder_cnn = EncoderCNN(D_embed)
 model = LSTM(D_embed, H, len(word_to_index), batch_size)
-feature_mapping = nn.Linear(4096, D_embed)
-caption_embedding = nn.Embedding(len(word_to_index),D_embed)
 if torch.cuda.is_available():
     model.cuda()
-    feature_mapping.cuda()
-    caption_embedding.cuda()
-model.load_state_dict(torch.load('model/model2.pt'))
-feature_mapping.load_state_dict(torch.load('model/feature_mapping2.pt'))
-caption_embedding.load_state_dict(torch.load('model/caption_embedding2.pt'))
+model.load_state_dict(torch.load('model/model.01.pt'))
 loss_function = nn.NLLLoss()
 initial_word = ""
 for epoch in range(1):
@@ -67,22 +61,16 @@ for epoch in range(1):
             target_caption += index_to_word[word_index] + " "
 
     image_features = encoder_cnn(images)
-    #image_features = feature_mapping(image_features)
-    #initial_score, initial_word_space = model(image_features)
     initial_score = model(image_features)
     sentence = ""
     index = 0
     input_batch = data_loader.create_input_batch_captions([[1,0] for _ in range(batch_size)])
-    #input_features = caption_embedding(input_batch)
-    #initial_score, initial_word_space = model(input_features)
     initial_score = model(input_batch)
     best_score, best_index = initial_score.data[0].max(0)
     best_word = index_to_word[best_index[0]]
     while index < 18 and best_word != "EOS":
         sentence += best_word + " "
         input_batch = data_loader.create_input_batch_captions([[best_index[0], 0] for _ in range(batch_size)])
-        #input_features = caption_embedding(input_batch)
-        #initial_score, initial_word_space = model(input_features)
         initial_score = model(input_batch)
         best_score, best_index = initial_score.data[0].max(0)
         best_word = index_to_word[best_index[0]]
