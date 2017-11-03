@@ -8,6 +8,7 @@ import data_loader
 from nltk import bleu
 from lstm import LSTM
 from encoder import EncoderCNN
+import evaluator
 
 # defining image size
 transform = transforms.Compose([
@@ -38,21 +39,40 @@ images = []
 print("using old vocabulary")
 word_to_index, index_to_word = data_loader.load_vocab()
 
+batched_val_set = data_loader.load_batched_data('batched_val_set.txt', word_to_index)
+
+
 batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 32, 124, 32
+D_embed, H, D_out = 32, 256, 32
 
 encoder_cnn = EncoderCNN(D_embed)
 model = LSTM(D_embed, H, len(word_to_index), batch_size)
 if torch.cuda.is_available():
     model.cuda()
-model.load_state_dict(torch.load('model/model.01.pt'))
+
+
+image, captions = evaluator.create_predict_batch(training_set, batched_val_set, batch_size=32)
+
+model.load_state_dict(torch.load('model/model_5000.pt'))
+#prediction = evaluator.beam_search(encoder_cnn, model, image, 32, beam_size=5)[1]
+prediction = evaluator.beam_search(encoder_cnn, model, image, 32, beam_size=5)
+'''
+result = ""
+for ind in prediction:
+  result += index_to_word[ind] + " "
+print(result)
+'''
+print(prediction)
 loss_function = nn.NLLLoss()
 initial_word = ""
+model = model.eval()
 for epoch in range(1):
     model.zero_grad()
     model.hidden = model.init_hidden()
 
-    images, captions = data_loader.create_val_batch(training_set, word_to_index, 5, batch_size=batch_size)
+    
+    #images, captions = data_loader.create_val_batch(training_set, word_to_index, 5, batch_size=batch_size)
+    images, captions = data_loader.create_batch(training_set, batched_val_set, word_to_index, 5, batch_size=batch_size)
     target_caption = ""
     for word_index in captions[0]:
         if word_index == 1:
@@ -64,15 +84,15 @@ for epoch in range(1):
     initial_score = model(image_features)
     sentence = ""
     index = 0
-    input_batch = data_loader.create_input_batch_captions([[1,0] for _ in range(batch_size)])
-    initial_score = model(input_batch)
-    best_score, best_index = initial_score.data[0].max(0)
+    input_batch = data_loader.create_input_batch_captions([[1] for _ in range(batch_size)])
+    score = model(input_batch)
+    best_score, best_index = score.data[0].max(0)
     best_word = index_to_word[best_index[0]]
     while index < 18 and best_word != "EOS":
         sentence += best_word + " "
-        input_batch = data_loader.create_input_batch_captions([[best_index[0], 0] for _ in range(batch_size)])
-        initial_score = model(input_batch)
-        best_score, best_index = initial_score.data[0].max(0)
+        input_batch = data_loader.create_input_batch_captions([[best_index[0]] for _ in range(batch_size)])
+        score = model(input_batch)
+        best_score, best_index = score.data[0].max(0)
         best_word = index_to_word[best_index[0]]
         print(sentence)
         index += 1

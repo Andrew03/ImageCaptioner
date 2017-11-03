@@ -44,7 +44,7 @@ val_set = data_loader.load_data(images='data/val2014', annotations='data/annotat
 # rebuilds vocabulary if necessary or specified
 # otherwise, uses the already prebuilt vocabulary
 print("rebuilding vocabulary" if build_vocab == True else "using old vocabulary", file=sys.stderr)
-word_to_index, index_to_word  = data_loader.create_vocab(train, min_occurrence=5) if build_vocab == True else (data_loader.load_vocab())
+word_to_index, index_to_word  = data_loader.create_vocab(train_set, min_occurrence=5) if build_vocab == True else (data_loader.load_vocab())
 # overwrites the prebuilt vocabulary if specified, otherwise stores the vocabulary
 if build_vocab == True:
   data_loader.write_vocab_to_file(index_to_word)
@@ -63,23 +63,12 @@ if batched_val_set == None:
 # CNN is vgg16 with batch normalization
 # Doesn't seem like vgg16 with batch normalization works right now... might be me needing to update pytorch
 # cnn_encoder = models.vgg16_bn(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16_bn(pretrained=True))
-#cnn_encoder = models.vgg16(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16(pretrained=True))
-# think this is an easier way of using cuda when available but should check
 
-#print('Number of samples: ', len(training_set))
-#img, target = training_set[3]
-#print("Image Size: ", img.size())
-#print(target)
-
-
-# CNN takes in image and passes feature vector to RNN once at time step -1
-# Then RNN takes in word at time step i and tries to make that word more probable 
-# What does it mean for the image and words to be mapped to the same space?
 # Does that mean we combine the image feature vector and the word vector?
 
 # creating the model
 batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 32, 124,32
+D_embed, H, D_out = 32, 256, 32
 
 encoder_cnn = EncoderCNN(D_embed)
 model = LSTM(D_embed, H, len(word_to_index), batch_size)
@@ -87,7 +76,7 @@ if torch.cuda.is_available():
   model.cuda()
 loss_function = nn.NLLLoss()
 # tried using 0.001
-optimizer = optim.Adam(model.parameters(), lr=0.0005)
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=0.0001)
 
 record_error = False
 if len(sys.argv) > 1:
@@ -138,4 +127,4 @@ for epoch in range(5000):
   #print(str(loss.data.select(0, 0) / batch_size))
   print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
 error_file.close()
-torch.save(model.state_dict(), 'model/model5.01.pt')
+torch.save(model.state_dict(), 'model/model_5000.pt')
