@@ -6,6 +6,7 @@ import re
 import json
 import random
 import sys
+import string
 from random import randint
 
 def load_image_information(path):
@@ -110,8 +111,8 @@ def write_batched_data(batched_data, file_name):
 
 def batch_data(data_set, word_to_index, batch_size=1):
   batched_set = {}
-  #for i in range(len(data_set)):
-  for i in range(1000):
+  for i in range(len(data_set)):
+    #for i in range(1000):
     image, captions = data_set[i]
     for caption in captions:
       sentence = split_sentence(caption)
@@ -134,27 +135,6 @@ def image_to_variable(image):
     image = image.cuda()
   return autograd.Variable(image)
 
-def create_val_batch(training_set, word_to_index, num_captions, batch_size=1, randomize=False):
-    images = []
-    captions = []
-    max_length = 0
-    for _ in range(batch_size):
-        randInt = randint(0, len(training_set) - 1)
-        image, caption = training_set[randInt]
-        images.append(image)
-        sentence = split_sentence(caption[randint(0, num_captions - 1)])
-        # inserting and appending start of string and end of string tags
-        sentence.insert(0, "SOS")
-        sentence.append("EOS")
-        captions.append([get_index(word, word_to_index) for word in sentence])
-        if len(sentence) > max_length:
-            max_length = len(sentence)
-    for _ in range(batch_size):
-        while len(captions[_]) < max_length:
-            captions[_].append(get_index("EOS", word_to_index))
-    images = image_to_variable(torch.stack(images, 0))
-    return images, captions
-
 # returns images in a stored tensor, captions are just in a list, need to format to input or output manually
 def create_batch(image_set, batched_data, word_to_index, num_captions, batch_size=1, randomize=False):
   images = []
@@ -170,11 +150,14 @@ def create_batch(image_set, batched_data, word_to_index, num_captions, batch_siz
   images = image_to_variable(torch.stack(images, 0))
   return images, captions
 
-# remember to take EOS token from input
 def create_input_batch_captions(captions):
   inputs = []
   for caption in captions:
-    inputs.append(caption[:-1])
+    # strip the EOS token if it is there
+    if len(caption) > 1:
+      inputs.append(caption[:-1])
+    else:
+      inputs.append(caption)
   return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(inputs))
 
 # targets are a long vector, flatten them out
@@ -190,4 +173,13 @@ def get_index(word, word_to_index):
   return word_to_index[word] if word in word_to_index else word_to_index["UNK"]
 
 def split_sentence(sentence):
-    return re.findall(r"[\w']+|[.,!?;]", sentence.lower())
+  remove_punctuation_map = dict((ord(char), None) for char in string.punctuation)
+  sentence = sentence.translate(remove_punctuation_map)
+  return re.findall(r"[\w']+|[.,!?;]", sentence.lower())
+
+def caption_to_string(caption, index_to_word):
+  string_rep = ""
+  for word in caption:
+    if word != 1 and word != 2:
+      string_rep += index_to_word[word] + " "
+  return string_rep[:-1]
