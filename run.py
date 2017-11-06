@@ -19,81 +19,30 @@ transform = transforms.Compose([
         std=[0.229, 0.224, 0.225])
 ])
 
-image_dir = ""
-annotation_dir = ""
-build_vocab = False
-if len(sys.argv) == 1:
-    image_dir, annotation_dir, build_vocab = data_loader.get_file_information()
-elif len(sys.argv) < 3:
-    print("Include image data set and caption data set")
-    sys.exit()
-else:
-    image_dir = sys.argv[1]
-    annotation_dir = sys.argv[2]
-
-training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
-
-batch_size = 32
-images = []
+training_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
 
 print("using old vocabulary")
 word_to_index, index_to_word = data_loader.load_vocab()
 
 batched_val_set = data_loader.load_batched_data('batched_val_set.txt', word_to_index)
 
-
 batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 32, 256, 32
+D_embed, H, D_out = 128, 256, 32
 
 encoder_cnn = EncoderCNN(D_embed)
 model = LSTM(D_embed, H, len(word_to_index), batch_size)
 if torch.cuda.is_available():
     model.cuda()
 
-
-image, captions = evaluator.create_predict_batch(training_set, batched_val_set, batch_size=32)
-
-model.load_state_dict(torch.load('model/model_5000.pt'))
-#prediction = evaluator.beam_search(encoder_cnn, model, image, 32, beam_size=5)[1]
-prediction = evaluator.beam_search(encoder_cnn, model, image, 32, beam_size=5)
-'''
-result = ""
-for ind in prediction:
-  result += index_to_word[ind] + " "
-print(result)
-'''
-print(prediction)
+model.load_state_dict(torch.load('model/model_1epoch_dropout_2.pt'))
 loss_function = nn.NLLLoss()
 initial_word = ""
 model = model.eval()
 for epoch in range(1):
-    model.zero_grad()
     model.hidden = model.init_hidden()
-
-    
-    #images, captions = data_loader.create_val_batch(training_set, word_to_index, 5, batch_size=batch_size)
-    images, captions = data_loader.create_batch(training_set, batched_val_set, word_to_index, 5, batch_size=batch_size)
-    target_caption = ""
-    for word_index in captions[0]:
-        if word_index == 1:
-            break
-        elif word_index != 2:
-            target_caption += index_to_word[word_index] + " "
-
-    image_features = encoder_cnn(images)
-    initial_score = model(image_features)
-    sentence = ""
-    index = 0
-    input_batch = data_loader.create_input_batch_captions([[1] for _ in range(batch_size)])
-    score = model(input_batch)
-    best_score, best_index = score.data[0].max(0)
-    best_word = index_to_word[best_index[0]]
-    while index < 18 and best_word != "EOS":
-        sentence += best_word + " "
-        input_batch = data_loader.create_input_batch_captions([[best_index[0]] for _ in range(batch_size)])
-        score = model(input_batch)
-        best_score, best_index = score.data[0].max(0)
-        best_word = index_to_word[best_index[0]]
-        print(sentence)
-        index += 1
+    image, captions = evaluator.create_predict_batch(training_set, batched_val_set, batch_size=32)
+    prediction = evaluator.beam_search(encoder_cnn, model, image, 32, beam_size=10)
+    for caption in prediction:
+      print("score is: " + str(caption[0]) + ", caption is: " + data_loader.caption_to_string(caption[1], index_to_word))
+    #print(prediction)
     print(captions[0])

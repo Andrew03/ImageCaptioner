@@ -10,6 +10,7 @@ class LSTM(nn.Module):
     self.word_embedding_layer = nn.Embedding(vocab_size, embedding_dim)
     self.image_embedding_layer = nn.Linear(4096, embedding_dim)
     self.lstm = nn.LSTM(embedding_dim, hidden_dim)
+    self.dropout = nn.Dropout(p=0.2)
     self.embedding_dim = embedding_dim
     self.hidden2word = nn.Linear(hidden_dim, vocab_size)
     self.batch_size = batch_size
@@ -22,8 +23,10 @@ class LSTM(nn.Module):
 
   def forward(self, sentence):
     embed_value = self.word_embedding_layer(sentence) if type(sentence.data) == torch.cuda.LongTensor else self.image_embedding_layer(sentence)
+    embed_value = self.dropout(embed_value)
     lstm_out, self.hidden = self.lstm(
       embed_value.view(-1, len(sentence), self.embedding_dim), self.hidden)
+    lstm_out = self.dropout(lstm_out)
     words_space = self.hidden2word(lstm_out.view(-1, self.hidden_dim))
     words_score = F.log_softmax(words_space)
     return words_score

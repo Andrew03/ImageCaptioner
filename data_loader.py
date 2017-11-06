@@ -9,12 +9,6 @@ import sys
 import string
 from random import randint
 
-def load_image_information(path):
-  json_data = {}
-  with open(path) as f:
-    json_data = json.load(f)
-  return json_data['images']
-
 def get_file_information():
   image_dir = ""
   annotation_dir = ""
@@ -82,12 +76,11 @@ def load_batched_data(file_name, word_to_index):
     batched_data = {}
     data_file = open(file_name, 'r')
     num_keys = int(data_file.readline())
-    for _ in range(0, num_keys):
-      print ("index " + str(_) + " out of " + str(num_keys))
+    for _ in range(num_keys):
       key = int(data_file.readline())
       num_caps = int(data_file.readline())
       batched_data[key] = []
-      for _ in range(0, num_caps):
+      for _ in range(num_caps):
         image = int(data_file.readline())
         caption = data_file.readline().split(',')
         caption = [int(i) for i in caption[:-1]]
@@ -112,7 +105,6 @@ def write_batched_data(batched_data, file_name):
 def batch_data(data_set, word_to_index, batch_size=1):
   batched_set = {}
   for i in range(len(data_set)):
-    #for i in range(1000):
     image, captions = data_set[i]
     for caption in captions:
       sentence = split_sentence(caption)
@@ -136,7 +128,7 @@ def image_to_variable(image):
   return autograd.Variable(image)
 
 # returns images in a stored tensor, captions are just in a list, need to format to input or output manually
-def create_batch(image_set, batched_data, word_to_index, num_captions, batch_size=1, randomize=False):
+def create_batch(image_set, batched_data, word_to_index, batch_size=1, randomize=False):
   images = []
   captions = []
   index = random.choice(batched_data.keys())
@@ -149,6 +141,10 @@ def create_batch(image_set, batched_data, word_to_index, num_captions, batch_siz
     captions.append(image_caption[1])
   images = image_to_variable(torch.stack(images, 0))
   return images, captions
+
+def create_input_batch_images(image_set, image_indices):
+  images = [image_set[i][0] for i in image_indices]
+  return image_to_variable(torch.stack(images, 0)) 
 
 def create_input_batch_captions(captions):
   inputs = []

@@ -1,0 +1,174 @@
+1000,0.14923991695
+2000,0.146822387353
+3000,0.145289184675
+4000,0.145521835238
+5000,0.145048371851
+6000,0.144458003715
+7000,0.138508603275
+8000,0.146742189154
+9000,0.1495563104
+10000,0.151555233896
+11000,0.138701234981
+12000,0.137923350111
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+12896,0.131057513243
+13000,0.13371897012
+14000,0.141342780069
+15000,0.143700170591
+16000,0.144498909935
+17000,0.149176213816
+18000,0.147325720862
+19000,0.149954258427
+20000,0.147448710129
+21000,0.148463411033
+22000,0.133945982531
+23000,0.136108123064
+24000,0.138089882657
+25000,0.142284990773
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+25792,0.139382091256
+26000,0.144116048664
+27000,0.143910494596
+28000,0.130759568438
+29000,0.141081987917
+30000,0.136794359609
+31000,0.137212963626
+32000,0.135204196051
+33000,0.146304744482
+34000,0.148167306259
+35000,0.1485383863
+36000,0.14092609264
+37000,0.140982598215
+38000,0.145066479072
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+38688,0.135529501445
+39000,0.128982411623
+40000,0.13282586351
+41000,0.140030544326
+42000,0.13746650815
+43000,0.136148943976
+44000,0.139686628431
+45000,0.14270037517
+46000,0.145741957501
+47000,0.145911538526
+48000,0.148400095478
+49000,0.149633892402
+50000,0.145066793412
+51000,0.145270265266
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+51584,0.126984493653
+52000,0.136390250102
+53000,0.137967184857
+54000,0.141101851612
+55000,0.141415572613
+56000,0.141691222712
+57000,0.143942513764
+58000,0.148208940476
+59000,0.146262522191
+60000,0.134046663418
+61000,0.140558702499
+62000,0.137892770618
+63000,0.146675966531
+64000,0.145076807588
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+End of Epoch 
+64480,0.133821982834
