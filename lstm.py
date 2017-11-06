@@ -16,10 +16,15 @@ class LSTM(nn.Module):
     self.batch_size = batch_size
     self.hidden = self.init_hidden()
 
-  def init_hidden(self):
-    return (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor),
-      autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor)) if torch.cuda.is_available() else (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.FloatTensor),
-      autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.FloatTensor))
+  def init_hidden(self, batch_size=None):
+    if batch_size:
+      return (autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor),
+        autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor)) if torch.cuda.is_available() else (autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.FloatTensor),
+        autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.FloatTensor))
+    else:
+      return (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor),
+        autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor)) if torch.cuda.is_available() else (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.FloatTensor),
+        autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.FloatTensor))
 
   def forward(self, sentence):
     embed_value = self.word_embedding_layer(sentence) if type(sentence.data) == torch.cuda.LongTensor else self.image_embedding_layer(sentence)
