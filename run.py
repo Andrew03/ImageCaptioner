@@ -26,7 +26,7 @@ training_set = data_loader.load_data(images='data/val2014', annotations='data/an
 print("using old vocabulary")
 word_to_index, index_to_word = data_loader.load_vocab()
 
-batched_val_set = data_loader.load_batched_data('batched_val_set_10.txt', word_to_index)
+batched_val_set = data_loader.load_batched_data('batched_val_set_10.txt')
 
 batch_size = 32
 D_embed, H = 128, 256

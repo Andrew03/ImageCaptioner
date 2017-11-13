@@ -9,7 +9,7 @@ class LSTM(nn.Module):
     self.hidden_dim = hidden_dim
     self.word_embedding_layer = nn.Embedding(vocab_size, embedding_dim)
     self.image_embedding_layer = nn.Linear(4096, embedding_dim)
-    nn.init.xavier_normal(self.image_embedding_layer.weight)
+    #nn.init.xavier_normal(self.image_embedding_layer.weight)
     self.lstm = nn.LSTM(embedding_dim, hidden_dim)
     self.dropout = nn.Dropout(p=0.5)
     self.embedding_dim = embedding_dim

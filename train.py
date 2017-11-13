@@ -37,8 +37,8 @@ if build_vocab == True:
   data_loader.write_vocab_to_file(index_to_word)
 
 # batch the data
-batched_train_set = data_loader.load_batched_data('batched_train_set_10.txt', word_to_index)
-batched_val_set = data_loader.load_batched_data('batched_val_set_10.txt', word_to_index)
+batched_train_set = data_loader.load_batched_data('batched_train_set_10.txt')
+batched_val_set = data_loader.load_batched_data('batched_val_set_10.txt')
 if batched_train_set == None:
   batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=32)
   data_loader.write_batched_data(batched_train_set, file_name="batched_train_set_10.txt")
@@ -56,7 +56,7 @@ if torch.cuda.is_available():
   model.cuda()
 loss_function = nn.NLLLoss()
 # weight decay parameter adds L2
-optimizer = optim.Adam(model.parameters(), lr=0.005)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 record_error = False
 if len(sys.argv) > 1:
@@ -121,4 +121,4 @@ for epoch in range(1):
 if record_error == True:
   train_file.close()
   val_file.close()
-torch.save(model.state_dict(), 'model/model_1epoch_dropout_5_005_occurrence_10_xavier_normalized.pt')
+torch.save(model.state_dict(), 'model/model_1epoch_dropout_5_001_occurrence_10.pt')

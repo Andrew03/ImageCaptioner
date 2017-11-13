@@ -71,7 +71,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_
     iter_number += 1
   return word_to_index, index_to_word
 
-def load_batched_data(file_name, word_to_index):
+def load_batched_data(file_name):
   if os.path.isfile(file_name) == True:
     batched_data = {}
     data_file = open(file_name, 'r')
@@ -134,7 +134,7 @@ def create_batch(image_set, batched_data, word_to_index, batch_size=1, randomize
   index = random.choice(batched_data.keys())
   data_set = batched_data[index]
   random.shuffle(data_set)
-  image_caption_set = data_set[0:32]
+  image_caption_set = data_set[0:batch_size]
   for image_caption in image_caption_set:
     image, _ = image_set[image_caption[0]]
     images.append(image)
@@ -158,11 +158,11 @@ def create_input_batch_captions(captions):
 
 # targets are a long vector, flatten them out
 # remember to take SOS token from targets
+# remember to go b1w1, b2,w1, b3,w1
 def create_target_batch_captions(captions):
   targets = []
-  for caption in captions: 
-    for word_index in caption[1:]:
-      targets.append(word_index)
+  for i in range(1, len(captions[0])):
+    targets.extend([captions[j][i] for j in range(len(captions))])
   return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
 
 def get_index(word, word_to_index):
