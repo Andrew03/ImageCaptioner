@@ -28,7 +28,7 @@ def get_file_information():
   return image_dir, annotation_dir, build_vocab
 
 def load_vocab():
-  vocab_file = open('vocab.txt', 'r')
+  vocab_file = open('vocab_10.txt', 'r')
   index_to_word = vocab_file.read().splitlines()
   vocab_file.close()
   word_to_index = {}
@@ -40,7 +40,7 @@ def load_vocab():
 
 # input the vocab that contains the words, i.e index_to_word
 def write_vocab_to_file(vocab):
-  vocab_file = open('vocab.txt', 'w')
+  vocab_file = open('vocab_10.txt', 'w')
   for word in vocab:
     vocab_file.write(word + "\n")
   vocab_file.close()

@@ -2,3 +2,4 @@
 output/*.txt
 notifications/*
 *.swp
+model/*
