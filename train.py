@@ -25,7 +25,6 @@ transform = transforms.Compose([
 
 build_vocab = False
 
-#training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
 train_set = data_loader.load_data(images='data/train2014', annotations='data/annotations/captions_train2014.json', transform=transform)
 val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
 # rebuilds vocabulary if necessary or specified
@@ -36,18 +35,18 @@ word_to_index, index_to_word  = data_loader.create_vocab(train_set, min_occurren
 if build_vocab == True:
   data_loader.write_vocab_to_file(index_to_word)
 
+batch_size = 64
 # batch the data
-batched_train_set = data_loader.load_batched_data('batched_train_set_10.txt')
-batched_val_set = data_loader.load_batched_data('batched_val_set_10.txt')
+batched_train_set = data_loader.load_batched_data('batched_64_train_set_10.txt')
+batched_val_set = data_loader.load_batched_data('batched_64_val_set_10.txt')
 if batched_train_set == None:
-  batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=32)
-  data_loader.write_batched_data(batched_train_set, file_name="batched_train_set_10.txt")
+  batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=batch_size)
+  data_loader.write_batched_data(batched_train_set, file_name="batched_64_train_set_10.txt")
 if batched_val_set == None:
-  batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=32)
-  data_loader.write_batched_data(batched_val_set, file_name="batched_val_set_10.txt")
+  batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=batch_size)
+  data_loader.write_batched_data(batched_val_set, file_name="batched_64_val_set_10.txt")
 
 # creating the model
-batch_size = 32
 D_embed, H = 128, 256
 
 encoder_cnn = EncoderCNN(D_embed)
@@ -56,7 +55,7 @@ if torch.cuda.is_available():
   model.cuda()
 loss_function = nn.NLLLoss()
 # weight decay parameter adds L2
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
 record_error = False
 if len(sys.argv) > 1:
@@ -72,7 +71,7 @@ val_file = open(sys.argv[2], 'w') if record_error == True else None
 ## Every time we finish the training set we compute the average of the validate set
 '''
 index = 0
-for epoch in range(1):
+for epoch in range(10):
   train_keys = batched_train_set.keys()
   random.shuffle(train_keys)
   val_keys = batched_val_set.keys()
@@ -90,9 +89,9 @@ for epoch in range(1):
     model.train()
     loss = trainer.train_model(encoder_cnn, model, loss_function, optimizer, image_caption_set, train_set)
     train_sum_loss += loss
-    if index % 10 == 0:
+    if index % 100 == 0:
       if record_error == True:
-        train_file.write(str(index) + "," + str(train_sum_loss / 10) + "\n")
+        train_file.write(str(index) + "," + str(train_sum_loss / 100) + "\n")
       train_sum_loss = 0
     if index % 1000 == 0:
       val_sum_loss = 0
@@ -121,4 +120,4 @@ for epoch in range(1):
 if record_error == True:
   train_file.close()
   val_file.close()
-torch.save(model.state_dict(), 'model/model_1epoch_dropout_5_001_occurrence_10.pt')
+torch.save(model.state_dict(), 'model/model_10epoch_dropout_3_0001.pt')

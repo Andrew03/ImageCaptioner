@@ -36,7 +36,7 @@ model = LSTM(D_embed, H, len(word_to_index), batch_size)
 if torch.cuda.is_available():
   model.cuda()
 
-model.load_state_dict(torch.load('model/model_1epoch_dropout_5_001_occurrence_10_xavier_normalized.pt'))
+model.load_state_dict(torch.load(sys.argv[1]))
 loss_function = nn.NLLLoss()
 initial_word = ""
 model.eval()
@@ -45,7 +45,7 @@ for epoch in range(5):
   image, captions = evaluator.create_predict_batch(training_set, batched_val_set)
 
 
-  prediction = evaluator.beam_search(encoder_cnn, model, image, beam_size=5)
+  prediction = evaluator.beam_search(encoder_cnn, model, image, beam_size=10)
   for caption in prediction:
     print("score is: " + str(caption[0]) + ", caption is: " + data_loader.caption_to_string(caption[1], index_to_word))
   #print(prediction)
