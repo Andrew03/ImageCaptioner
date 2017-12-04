@@ -17,49 +17,6 @@ def create_predict_batch(training_data, batched_data, batch_size=1):
 
 def create_predict_input_captions(captions):
   return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(captions))
-  
-'''
-  image is a batch where 
-'''
-def beam_search(cnn, lstm, images, beam_size=1):
-  lstm.eval()
-  best_phrases = [[0, [1]]]
-  completed_phrases = []
-  image_features = cnn(images)
-  index = 0
-  lstm.hidden = lstm.init_hidden(1)
-  lstm(image_features)
-  input_captions = create_predict_input_captions([score_caption[1]])
-  init_score = lstm(input_captions)
-  lstm.hidden = (lstm.hidden[0].repeat(1, beam_size, 1), lstm.hidden[1].repeat(1, beam_size, 1))
-  while index < 20 and len(completed_phrases) < beam_size:
-    input_captions = create_predict_input_captions([score_caption[1]])
-    init_score = lstm(input_captions)
-    scores= init_score.data[-beam_size:]
-    best_candidates = []
-    lstm.hidden = (lstm.hidden[0].repeat(1, beam_size, 1), lstm.hidden[1].repeat(1, beam_size, 1))
-    lstm.hidden = lstm.hidden[0][0].select(0, index)
-    # changed up to here
-    for i in range(len(best_phrases)):
-      score = scores[i]
-      top_indices = zip(*heapq.nlargest(beam_size, enumerate(score), key=operator.itemgetter(1)))[0]
-      #print(top_indices)
-      best_candidates.extend([[best_phrases[i][0] + score[score_index], best_phrases[i][1] + [score_index]] for score_index in top_indices])
-    #print(best_candidates)
-    best_phrases = sorted(best_candidates, key=lambda score_caption: score_caption[0])[-beam_size:]
-    #best_phrases = sorted(best_candidates, key=lambda score_caption: score_caption[0])
-    #print("best phrases are")
-    #print(best_phrases)
-    for score_caption in best_phrases:
-      #print(score_caption)
-      if score_caption[1][-1] == 2:
-        completed_phrases.append(score_caption)
-        best_phrases.remove(score_caption)
-    index += 1
-  if len(completed_phrases) < beam_size:
-    completed_phrases.extend(best_phrases)
-  #return sorted(completed_phrases, key=lambda score_caption: score_caption[0])[-1]
-  return sorted(completed_phrases, key=lambda score_caption: score_caption[0])[-beam_size:]
 
 def beam_search(cnn, lstm, images, beam_size=1):
   lstm.eval()

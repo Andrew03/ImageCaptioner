@@ -9,9 +9,26 @@ import torchvision.models as models
 import sys
 import random
 import data_loader
+import file_namer
+import param_parser
 import trainer
 from lstm import LSTM
 from encoder import EncoderCNN
+
+params = param_parser.parse_params(sys.argv[1])
+if params is None:
+  print("invalid training parameter file")
+  sys.exit()
+min_occurrences = params[0]
+batch_size = params[1]
+embedding_dim = params[2]
+hidden_size = params[3]
+dropout = params[4]
+model_lr = params[5]
+encoder_lr = params[6]
+num_epochs = params[7]
+grad_clip = params[8]
+isNormalized = params[9]
 
 # defining image size
 transform = transforms.Compose([
@@ -23,46 +40,44 @@ transform = transforms.Compose([
     std=[0.229, 0.224, 0.225])
 ])
 
-build_vocab = False
-
 train_set = data_loader.load_data(images='data/train2014', annotations='data/annotations/captions_train2014.json', transform=transform)
 val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
-# rebuilds vocabulary if necessary or specified
-# otherwise, uses the already prebuilt vocabulary
-print("rebuilding vocabulary" if build_vocab == True else "using old vocabulary", file=sys.stderr)
-word_to_index, index_to_word  = data_loader.create_vocab(train_set, min_occurrence=10) if build_vocab == True else (data_loader.load_vocab())
-# overwrites the prebuilt vocabulary if specified, otherwise stores the vocabulary
-if build_vocab == True:
-  data_loader.write_vocab_to_file(index_to_word)
 
-batch_size = 64
-# batch the data
-batched_train_set = data_loader.load_batched_data('batched_64_train_set_10.txt')
-batched_val_set = data_loader.load_batched_data('batched_64_val_set_10.txt')
-if batched_train_set == None:
-  batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=batch_size)
-  data_loader.write_batched_data(batched_train_set, file_name="batched_64_train_set_10.txt")
-if batched_val_set == None:
-  batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=batch_size)
-  data_loader.write_batched_data(batched_val_set, file_name="batched_64_val_set_10.txt")
+# loads the vocabulary 
+word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name(min_occurrences))
+if word_to_index is None:
+  print("run the setup script to create the vocab")
+  sys.exit()
+# loads the batched data
+batched_train_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=True))
+batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
+if batched_train_set is None or batched_val_set is None:
+  print("run the setup script to batch the data")
+  sys.exit()
 
 # creating the model
-D_embed, H = 128, 256
-
-encoder_cnn = EncoderCNN(D_embed)
-model = LSTM(D_embed, H, len(word_to_index), batch_size)
+print(isNormalized)
+encoder_cnn = EncoderCNN(isNormalized)
+model = LSTM(embedding_dim, hidden_size, len(word_to_index), batch_size, dropout=dropout)
 if torch.cuda.is_available():
   model.cuda()
 loss_function = nn.NLLLoss()
 # weight decay parameter adds L2
-optimizer = optim.Adam(model.parameters(), lr=0.0001)
+optimizer = optim.Adam([
+  {'params': model.word_embedding_layer.parameters()},
+  {'params': model.lstm.parameters()},
+  {'params': model.hidden2word.parameters()},
+  {'params': model.image_embedding_layer.parameters(), 'lr': encoder_lr},
+  ], lr=model_lr)
 
-record_error = False
-if len(sys.argv) > 1:
-  record_error = True
-
-train_file = open(sys.argv[1], 'w') if record_error == True else None
-val_file = open(sys.argv[2], 'w') if record_error == True else None
+output_train_file_name = file_namer.make_output_name(batch_size, min_occurrences, \
+  num_epochs, dropout, model_lr, encoder_lr, embedding_dim, hidden_size, \
+  grad_clip, isTrain=True, isNormalized=isNormalized)
+output_train_file = open(output_train_file_name, 'w')
+output_val_file_name = file_namer.make_output_name(batch_size, min_occurrences, \
+  num_epochs, dropout, model_lr, encoder_lr, embedding_dim, hidden_size, \
+  grad_clip, isTrain=False, isNormalized=isNormalized)
+output_val_file = open(output_val_file_name, 'w')
 
 '''
 ## Training Design
@@ -71,53 +86,53 @@ val_file = open(sys.argv[2], 'w') if record_error == True else None
 ## Every time we finish the training set we compute the average of the validate set
 '''
 index = 0
-for epoch in range(10):
+print("starting training")
+for epoch in range(num_epochs):
+  # shuffle data set
   train_keys = batched_train_set.keys()
-  random.shuffle(train_keys)
   val_keys = batched_val_set.keys()
-  random.shuffle(val_keys)
   data_set = []
-  for train_key in train_keys:
-    train_key_set = batched_train_set[train_key]
-    for i in range(0, (len(train_key_set) / batch_size) - 1):
-      image_caption_set = train_key_set[i * batch_size : (i + 1) * batch_size]
-      data_set.append(image_caption_set)
+  # ensuring each batch is full
+  for train_key in random.sample(train_keys, len(train_keys)):
+    train_key_set = random.sample(batched_train_set[train_key], len(batched_train_set[train_key]))
+    data_set.extend(data_loader.group_data(train_key_set, batch_size))
   random.shuffle(data_set)
   train_sum_loss = 0
+  print("training eopch " + str(epoch) + " of " + str(num_epochs))
   for image_caption_set in data_set:
     index += 1
     model.train()
-    loss = trainer.train_model(encoder_cnn, model, loss_function, optimizer, image_caption_set, train_set)
+    loss = trainer.train_model(encoder_cnn, model, loss_function, optimizer, image_caption_set, train_set, grad_clip)
     train_sum_loss += loss
+    # record loss
     if index % 100 == 0:
-      if record_error == True:
-        train_file.write(str(index) + "," + str(train_sum_loss / 100) + "\n")
+      output_train_file.write(str(index) + "," + str(train_sum_loss / 100) + "\n")
       train_sum_loss = 0
-    if index % 1000 == 0:
-      val_sum_loss = 0
-      model.eval()
-      for i in range(100):
-        val_sum_loss += trainer.eval_model_random(encoder_cnn, model, loss_function, val_set, batched_val_set, word_to_index, batch_size=batch_size)
-      if record_error == True:
+      # run a random validation sample
+      if index % 1000 == 0:
+        val_sum_loss = 0
+        model.eval()
+        for i in range(100):
+          val_sum_loss += trainer.eval_model_random(encoder_cnn, model, loss_function, val_set, batched_val_set, word_to_index, batch_size=batch_size)
         val_sum_loss = val_sum_loss / 100
-        val_file.write(str(index) + "," + str(val_sum_loss) + "\n")
+        output_val_file.write(str(index) + "," + str(val_sum_loss) + "\n")
   val_sum_loss = 0
   num_trials = 0
-  if record_error == True:
-    val_file.write("End of Epoch \n")
-  for val_key in val_keys:
-    val_key_set = batched_val_set[val_key]
-    random.shuffle(val_key_set)
+  # run an entire validation batch
+  output_val_file.write("End of Epoch \n")
+  for val_key in random.sample(val_keys, len(val_keys)):
+    val_key_set = random.sample(batched_val_set[val_key], len(batched_val_set[val_key]))
     model.eval()
-    for i in range(0, (len(val_key_set) / batch_size) - 1):
-      image_caption_set = val_key_set[i * batch_size : (i + 1) * batch_size]
+    data_set = data_loader.group_data(val_key_set, batch_size)
+    for image_caption_set in data_set:
       loss = trainer.eval_model(encoder_cnn, model, loss_function, image_caption_set, val_set)
       val_sum_loss += loss
       num_trials += 1
-  if record_error == True:
-    val_file.write(str(index) + "," + str(val_sum_loss / num_trials) + "\n")
+  output_val_file.write(str(index) + "," + str(val_sum_loss / num_trials) + "\n")
 
-if record_error == True:
-  train_file.close()
-  val_file.close()
-torch.save(model.state_dict(), 'model/model_10epoch_dropout_3_0001.pt')
+output_train_file.close()
+output_val_file.close()
+torch.save(model.state_dict(), file_namer.make_save_name(batch_size, \
+  min_occurrences, num_epochs, dropout, model_lr, encoder_lr, embedding_dim, \
+  hidden_size, grad_clip, isNormalized=isNormalized))
+#torch.save(model.state_dict(), 'model/' + str(embedding_dim) + 'x' + str(hidden_size) + '_' + str(num_epochs) + 'epoch_dropout_5_' + str(lr) + 'grad3' + '.pt')

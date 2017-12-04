@@ -27,20 +27,23 @@ def get_file_information():
     build_vocab = (vocab_input == "y")
   return image_dir, annotation_dir, build_vocab
 
-def load_vocab():
-  vocab_file = open('vocab_10.txt', 'r')
-  index_to_word = vocab_file.read().splitlines()
-  vocab_file.close()
-  word_to_index = {}
-  index = 0
-  for word in index_to_word:
-    word_to_index[word] = index
-    index += 1
-  return word_to_index, index_to_word
+def load_vocab(file_name):
+  if os.path.isfile(file_name) == True:
+    vocab_file = open(file_name, 'r')
+    index_to_word = vocab_file.read().splitlines()
+    vocab_file.close()
+    word_to_index = {}
+    index = 0
+    for word in index_to_word:
+      word_to_index[word] = index
+      index += 1
+    return word_to_index, index_to_word
+  else:
+    return [None, None]
 
 # input the vocab that contains the words, i.e index_to_word
-def write_vocab_to_file(vocab):
-  vocab_file = open('vocab_10.txt', 'w')
+def write_vocab_to_file(vocab, file_name):
+  vocab_file = open(file_name, 'w')
   for word in vocab:
     vocab_file.write(word + "\n")
   vocab_file.close()
@@ -128,18 +131,22 @@ def image_to_variable(image):
   return autograd.Variable(image)
 
 # returns images in a stored tensor, captions are just in a list, need to format to input or output manually
-def create_batch(image_set, batched_data, word_to_index, batch_size=1, randomize=False):
+def create_data_batch(image_set, batched_data, word_to_index, batch_size=1, randomize=False):
   images = []
   captions = []
   index = random.choice(batched_data.keys())
   data_set = batched_data[index]
-  random.shuffle(data_set)
-  image_caption_set = data_set[0:batch_size]
+  #print(len(data_set))
+  image_caption_set = random.sample(data_set, batch_size)
+  #random.shuffle(data_set)
+  #image_caption_set = data_set[0:batch_size]
   for image_caption in image_caption_set:
     image, _ = image_set[image_caption[0]]
     images.append(image)
     captions.append(image_caption[1])
   images = image_to_variable(torch.stack(images, 0))
+  #print(captions[0])
+  #print(len(captions))
   return images, captions
 
 def create_input_batch_images(image_set, image_indices):
@@ -156,13 +163,23 @@ def create_input_batch_captions(captions):
       inputs.append(caption)
   return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(inputs))
 
+def group_data(dataset, batch_size):
+  grouped_set = []
+  for i in range(len(dataset) / batch_size - 1):
+    grouped_set.append(dataset[i * batch_size : (i + 1) * batch_size])
+  return grouped_set
+
 # targets are a long vector, flatten them out
 # remember to take SOS token from targets
 # remember to go b1w1, b2,w1, b3,w1
 def create_target_batch_captions(captions):
   targets = []
+  '''
   for i in range(1, len(captions[0])):
     targets.extend([captions[j][i] for j in range(len(captions))])
+  '''
+  for caption in captions:
+    targets += caption[1:]
   return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
 
 def get_index(word, word_to_index):
