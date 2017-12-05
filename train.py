@@ -7,9 +7,33 @@ import torchvision.transforms as transforms
 import torch.autograd as autograd
 import torchvision.models as models
 import sys
+import random
+from tqdm import trange
 import data_loader
+import file_namer
+import param_parser
+import trainer
 from lstm import LSTM
 from encoder import EncoderCNN
+
+'''
+## Training Parameters
+## Grabbing the training parameters from the parameters file
+'''
+params = param_parser.parse_train_params(sys.argv[1])
+if params is None:
+  print("invalid training parameter file")
+  sys.exit()
+min_occurrences = params[0]
+batch_size = params[1]
+embedding_dim = params[2]
+hidden_size = params[3]
+dropout = params[4]
+model_lr = params[5]
+encoder_lr = params[6]
+num_epochs = params[7]
+grad_clip = params[8]
+isNormalized = params[9]
 
 # defining image size
 transform = transforms.Compose([
@@ -21,121 +45,145 @@ transform = transforms.Compose([
     std=[0.229, 0.224, 0.225])
 ])
 
-image_dir = ""
-annotation_dir = ""
-build_vocab = False
 '''
-if len(sys.argv) == 1:
-  image_dir, annotation_dir, build_vocab = data_loader.get_file_information()
-elif len(sys.argv) < 3:
-  print("Include image data set and caption data set")
-  sys.exit()
-else:
-  image_dir = sys.argv[1]
-  annotation_dir = sys.argv[2]
-  if len(sys.argv) > 3:
-    build_vocab = True
+## Loading the different data sets the model uses to train
+## train_set and val_set store the actual images and captions in word form
+## word_to_index and index_to_word are used to store the vocabulary
+## batched_train_set and batched_val_set store batched sets of image_indices and captions
 '''
-    
-
-#training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
+# loading the data sets
 train_set = data_loader.load_data(images='data/train2014', annotations='data/annotations/captions_train2014.json', transform=transform)
 val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
-# rebuilds vocabulary if necessary or specified
-# otherwise, uses the already prebuilt vocabulary
-print("rebuilding vocabulary" if build_vocab == True else "using old vocabulary", file=sys.stderr)
-word_to_index, index_to_word  = data_loader.create_vocab(train, min_occurrence=5) if build_vocab == True else (data_loader.load_vocab())
-# overwrites the prebuilt vocabulary if specified, otherwise stores the vocabulary
-if build_vocab == True:
-  data_loader.write_vocab_to_file(index_to_word)
-# batch the data
-#batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=32)
-#batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=32)
-batched_train_set = data_loader.load_batched_data('batched_train_set.txt', word_to_index)
-batched_val_set = data_loader.load_batched_data('batched_val_set.txt', word_to_index)
-if batched_train_set == None:
-  batched_train_set = data_loader.batch_data(train_set, word_to_index, batch_size=32)
-  data_loader.write_batched_data(batched_train_set, file_name="batched_train_set.txt")
-if batched_val_set == None:
-  batched_val_set = data_loader.batch_data(val_set, word_to_index, batch_size=32)
-  data_loader.write_batched_data(batched_val_set, file_name="batched_val_set.txt")
+# loads the vocabulary 
+word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name(min_occurrences))
+if word_to_index is None:
+  print("run the setup script to create the vocab")
+  sys.exit()
+# loads the batched data
+batched_train_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=True))
+batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
+if batched_train_set is None or batched_val_set is None:
+  print("run the setup script to batch the data")
+  sys.exit()
 
-# CNN is vgg16 with batch normalization
-# Doesn't seem like vgg16 with batch normalization works right now... might be me needing to update pytorch
-# cnn_encoder = models.vgg16_bn(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16_bn(pretrained=True))
-#cnn_encoder = models.vgg16(pretrained=True).cuda() if torch.cuda.is_available() else (models.vgg16(pretrained=True))
-# think this is an easier way of using cuda when available but should check
-
-#print('Number of samples: ', len(training_set))
-#img, target = training_set[3]
-#print("Image Size: ", img.size())
-#print(target)
-
-
-# CNN takes in image and passes feature vector to RNN once at time step -1
-# Then RNN takes in word at time step i and tries to make that word more probable 
-# What does it mean for the image and words to be mapped to the same space?
-# Does that mean we combine the image feature vector and the word vector?
-
-# creating the model
-batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 32, 124,32
-
-encoder_cnn = EncoderCNN(D_embed)
-model = LSTM(D_embed, H, len(word_to_index), batch_size)
+'''
+## Creating the Model and Optimizer
+## Instantiate the encoder and lstm and loss function and optimizer
+'''
+encoder_cnn = EncoderCNN(isNormalized)
+model = LSTM(embedding_dim, hidden_size, len(word_to_index), batch_size, dropout=dropout)
 if torch.cuda.is_available():
   model.cuda()
 loss_function = nn.NLLLoss()
-# tried using 0.001
-optimizer = optim.Adam(model.parameters(), lr=0.0005)
+# weight decay parameter adds L2
+optimizer = optim.Adam([
+  {'params': model.word_embedding_layer.parameters()},
+  {'params': model.lstm.parameters()},
+  {'params': model.hidden2word.parameters()},
+  {'params': model.image_embedding_layer.parameters(), 'lr': encoder_lr},
+  ], lr=model_lr)
 
-record_error = False
-if len(sys.argv) > 1:
-  record_error = True
+'''
+## Output Files
+## Creating output files to write results to
+'''
+output_train_file_name = file_namer.make_output_name(batch_size, min_occurrences, \
+  num_epochs, dropout, model_lr, encoder_lr, embedding_dim, hidden_size, \
+  grad_clip, isTrain=True, isNormalized=isNormalized)
+output_train_file = open(output_train_file_name, 'w')
+output_val_file_name = file_namer.make_output_name(batch_size, min_occurrences, \
+  num_epochs, dropout, model_lr, encoder_lr, embedding_dim, hidden_size, \
+  grad_clip, isTrain=False, isNormalized=isNormalized)
+output_val_file = open(output_val_file_name, 'w')
 
-error_file = open(sys.argv[1], 'w') if record_error == True else None
+index = 0
+start_epoch = 0
 
-for epoch in range(5000):
-  # resetting gradients and hidden layer values
-  model.zero_grad()
-  model.hidden = model.init_hidden()
-
-  # training set
-  train_images, train_captions = data_loader.create_batch(train_set, batched_train_set, word_to_index, 5, batch_size=batch_size)
-  train_input_captions = data_loader.create_input_batch_captions(train_captions)
-  train_target_captions = data_loader.create_target_batch_captions(train_captions)
-  # validation set
-  val_images, val_captions = data_loader.create_batch(val_set, batched_val_set, word_to_index, 5, batch_size=batch_size)
-  val_input_captions = data_loader.create_input_batch_captions(val_captions)
-  val_target_captions = data_loader.create_target_batch_captions(val_captions)
-
-  # training
-  train_image_features = encoder_cnn(train_images)
-  train_image_features = autograd.Variable(train_image_features.data)
-  # do i need to store initial score?
-  initial_score = model(train_image_features)
+'''
+## Loading Checkpoint
+## Searches for a saved checkpoint, using the one with the most epochs if one exists
+## Loads the epoch, index, model and optimizer states
+'''
+save_name = file_namer.make_save_name(batch_size, min_occurrences, num_epochs, dropout, \
+  model_lr, encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized)
+checkpoint_name = file_namer.get_checkpoint(save_name)
+if checkpoint_name is not None:
+  print("loading from checkpoint " + str(checkpiont_name))
+  checkpoint = torch.load(checkpoint_name)
+  start_epoch = checkpoint['epoch']
+  index = checkpoint['index']
+  model.load_state_dict(checkpoint['state_dict'])
+  optimizer.load_state_dict(checkpoint['optimizer'])
   
-  train_caption_scores = model(train_input_captions)
-  loss = loss_function(train_caption_scores, train_target_captions)
+'''
+## Training Design
+## epoch is the number of times we go through the training set
+## Every 1000 training batches we compute the average of 100 validate batches
+## Every time we finish the training set we compute the average of the validate set
+'''
+progress_bar = trange(start_epoch, num_epochs)
+progress_bar.set_description('Epoch %i (Train)' % start_epoch)
+progress_bar.set_postfix(epoch=start_epoch, loss=0, index=index)
+for epoch in progress_bar: #range(start_epoch, num_epochs):
+  # shuffle data set
+  train_keys = batched_train_set.keys()
+  val_keys = batched_val_set.keys()
+  data_set = []
+  # ensuring each batch is full
+  for train_key in random.sample(train_keys, len(train_keys)):
+    train_key_set = random.sample(batched_train_set[train_key], len(batched_train_set[train_key]))
+    data_set.extend(data_loader.group_data(train_key_set, batch_size))
+  random.shuffle(data_set)
+  train_sum_loss = 0
+  #print("training eopch " + str(epoch) + " of " + str(num_epochs))
+  for image_caption_set in data_set:
+    index += 1
+    model.train()
+    loss = trainer.train_model(encoder_cnn, model, loss_function, optimizer, image_caption_set, train_set, grad_clip)
+    train_sum_loss += loss
+    # record loss
+    if index % 100 == 0:
+      output_train_file.write(str(index) + "," + str(train_sum_loss / 100) + "\n")
+      train_sum_loss = 0
+      progress_bar.set_description('Epoch %i (Train)' % epoch)
+      progress_bar.set_postfix(loss=(train_sum_loss / 100), index=index, out_of=(len(data_set) * num_epochs))
+      # run a random validation sample
+      if index % 1000 == 0:
+        val_sum_loss = 0
+        model.eval()
+        for i in range(100):
+          val_sum_loss += trainer.eval_model_random(encoder_cnn, model, loss_function, val_set, batched_val_set, word_to_index, batch_size=batch_size)
+        val_sum_loss = val_sum_loss / 100
+        output_val_file.write(str(index) + "," + str(val_sum_loss) + "\n")
+        progress_bar.set_description('Epoch %i (Train/Val)' % epoch)
+        progress_bar.set_postfix(loss=(val_sum_loss / 100), index=index, out_of=(len(data_set) * num_epochs))
+  val_sum_loss = 0
+  num_trials = 0
+  # run an entire validation batch
+  output_val_file.write("End of Epoch \n")
+  for val_key in random.sample(val_keys, len(val_keys)):
+    val_key_set = random.sample(batched_val_set[val_key], len(batched_val_set[val_key]))
+    model.eval()
+    data_set = data_loader.group_data(val_key_set, batch_size)
+    for image_caption_set in data_set:
+      loss = trainer.eval_model(encoder_cnn, model, loss_function, image_caption_set, val_set)
+      val_sum_loss += loss
+      num_trials += 1
+      if num_trials % 100 == 0:
+        progress_bar.set_description('Epoch %i (Val)' % epoch)
+        progress_bar.set_postfix(loss=(val_sum_loss / num_trials), trial_number=num_trials, out_of=len(data_set))
+  output_val_file.write(str(index) + "," + str(val_sum_loss / num_trials) + "\n")
 
-  if record_error == True:
-    error_file.write(str(loss.data.select(0, 0) / batch_size) + "\n")
-  #print(str(loss.data.select(0, 0) / batch_size))
-  print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
-  loss.backward()
-  optimizer.step()
-
-  model.hidden = model.init_hidden()
-  # validating
-  val_image_features = encoder_cnn(val_images)
-  # do i need to store initial score?
-  initial_score = model(val_image_features)
-  
-  val_caption_scores = model(val_input_captions)
-  loss = loss_function(val_caption_scores, val_target_captions)
-  if record_error == True:
-    error_file.write(str(loss.data.select(0, 0) / batch_size) + "\n")
-  #print(str(loss.data.select(0, 0) / batch_size))
-  print(str(epoch) + ", score: " + str(loss.data.select(0, 0) / batch_size), file=sys.stderr)
-error_file.close()
-torch.save(model.state_dict(), 'model/model5.01.pt')
+output_train_file.close()
+output_val_file.close()
+'''
+torch.save(model.state_dict(), file_namer.make_save_name(batch_size, \
+  min_occurrences, num_epochs, dropout, model_lr, encoder_lr, embedding_dim, \
+  hidden_size, grad_clip, isNormalized=isNormalized))
+'''
+torch.save({'epoch': num_epoch,
+            'index': index,
+            'state_dict': model.state_dict(),
+            'optimizer': optimizer.state_dict()}, file_namer.make_save_name(batch_size, \
+              min_occurrences, num_epochs, dropout, model_lr, encoder_lr, \
+              embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized))

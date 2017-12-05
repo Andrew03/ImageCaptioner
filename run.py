@@ -2,78 +2,92 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
-import torch.autograd as autograd
 import sys
+import os.path
 import data_loader
+import file_namer
+import param_parser
+import evaluator
 from nltk import bleu
 from lstm import LSTM
 from encoder import EncoderCNN
 
+'''
+## Run Parameters
+## Grabbing the run parameters from the parameters file
+'''
+params = param_parser.parse_run_params(sys.argv[1])
+if params is None:
+  print("invalid run parameter file")
+  sys.exit()
+min_occurrences = params[0]
+batch_size = params[1]
+embedding_dim = params[2]
+hidden_size = params[3]
+dropout = params[4]
+model_lr = params[5]
+encoder_lr = params[6]
+num_epochs = params[7]
+grad_clip = params[8]
+num_runs = params[9]
+isNormalized = params[10]
+
 # defining image size
 transform = transforms.Compose([
-    transforms.Scale(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225])
+  transforms.Scale(256),
+  transforms.CenterCrop(224),
+  transforms.ToTensor(),
+  # PyTorch says iamges must be normalized like this
+  transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    std=[0.229, 0.224, 0.225])
 ])
 
-image_dir = ""
-annotation_dir = ""
-build_vocab = False
-if len(sys.argv) == 1:
-    image_dir, annotation_dir, build_vocab = data_loader.get_file_information()
-elif len(sys.argv) < 3:
-    print("Include image data set and caption data set")
-    sys.exit()
-else:
-    image_dir = sys.argv[1]
-    annotation_dir = sys.argv[2]
+'''
+## Loading the different data sets the model uses to evaluate 
+## val_set stores the actual images and captions in word form
+## word_to_index and index_to_word are used to store the vocabulary
+## batched_val_set stores the batched data sets of image_indices and captions
+'''
+# loading the data sets
+val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
+# loads the vocabulary
+word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name(min_occurrences))
+# loads the batched data
+batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
 
-training_set = data_loader.load_data(images=image_dir, annotations=annotation_dir, transform=transform)
-
-batch_size = 32
-images = []
-
-print("using old vocabulary")
-word_to_index, index_to_word = data_loader.load_vocab()
-
-batch_size, min_occurrences = 32, 10
-D_embed, H, D_out = 32, 124, 32
-
-encoder_cnn = EncoderCNN(D_embed)
-model = LSTM(D_embed, H, len(word_to_index), batch_size)
+'''
+## Creating the Model
+## Instantiate the encoder and lstm and loss function
+'''
+encoder_cnn = EncoderCNN(isNormalized)
+model = LSTM(embedding_dim, hidden_size, len(word_to_index), batch_size, dropout=dropout)
 if torch.cuda.is_available():
-    model.cuda()
-model.load_state_dict(torch.load('model/model.01.pt'))
+  model.cuda()
 loss_function = nn.NLLLoss()
+
+'''
+## Loading Checkpoint
+## Loads the model from the checkpoint specified in run parameters
+'''
+checkpoint_name = file_namer.make_save_name(batch_size, min_occurrences, num_epochs, dropout, \
+  model_lr, encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized)
+if not os.path.isfile(checkpoint_name):
+  print("Invalid run parameters!")
+  print("Checkpoint " + str(checkpoint_name) + " does not exist!")
+  sys.exit()
+checkpoint = torch.load(checkpoint_name)
+model.load_state_dict(checkpoint['state_dict'])
+#model.load_state_dict(torch.load(checkpoint_name))
+
 initial_word = ""
-for epoch in range(1):
-    model.zero_grad()
-    model.hidden = model.init_hidden()
-
-    images, captions = data_loader.create_val_batch(training_set, word_to_index, 5, batch_size=batch_size)
-    target_caption = ""
-    for word_index in captions[0]:
-        if word_index == 1:
-            break
-        elif word_index != 2:
-            target_caption += index_to_word[word_index] + " "
-
-    image_features = encoder_cnn(images)
-    initial_score = model(image_features)
-    sentence = ""
-    index = 0
-    input_batch = data_loader.create_input_batch_captions([[1,0] for _ in range(batch_size)])
-    initial_score = model(input_batch)
-    best_score, best_index = initial_score.data[0].max(0)
-    best_word = index_to_word[best_index[0]]
-    while index < 18 and best_word != "EOS":
-        sentence += best_word + " "
-        input_batch = data_loader.create_input_batch_captions([[best_index[0], 0] for _ in range(batch_size)])
-        initial_score = model(input_batch)
-        best_score, best_index = initial_score.data[0].max(0)
-        best_word = index_to_word[best_index[0]]
-        print(sentence)
-        index += 1
-    print(captions[0])
+model.eval()
+for epoch in range(num_runs):
+  model.hidden = model.init_hidden()
+  image, image_index, captions = evaluator.create_predict_batch(val_set, batched_val_set)
+  prediction = evaluator.beam_search(encoder_cnn, model, image, beam_size=10)
+  for caption in prediction:
+    print("score is: " + str(caption[0]) + ", caption is: " + data_loader.caption_to_string(caption[1], index_to_word))
+  print("actual captions are")
+  captions = data_loader.get_all_captions(image_index, batched_val_set)
+  for caption in captions:
+    print(data_loader.caption_to_string(caption, index_to_word))

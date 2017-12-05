@@ -6,13 +6,8 @@ import re
 import json
 import random
 import sys
+import string
 from random import randint
-
-def load_image_information(path):
-  json_data = {}
-  with open(path) as f:
-    json_data = json.load(f)
-  return json_data['images']
 
 def get_file_information():
   image_dir = ""
@@ -32,20 +27,23 @@ def get_file_information():
     build_vocab = (vocab_input == "y")
   return image_dir, annotation_dir, build_vocab
 
-def load_vocab():
-  vocab_file = open('vocab.txt', 'r')
-  index_to_word = vocab_file.read().splitlines()
-  vocab_file.close()
-  word_to_index = {}
-  index = 0
-  for word in index_to_word:
-    word_to_index[word] = index
-    index += 1
-  return word_to_index, index_to_word
+def load_vocab(file_name):
+  if os.path.isfile(file_name) == True:
+    vocab_file = open(file_name, 'r')
+    index_to_word = vocab_file.read().splitlines()
+    vocab_file.close()
+    word_to_index = {}
+    index = 0
+    for word in index_to_word:
+      word_to_index[word] = index
+      index += 1
+    return word_to_index, index_to_word
+  else:
+    return [None, None]
 
 # input the vocab that contains the words, i.e index_to_word
-def write_vocab_to_file(vocab):
-  vocab_file = open('vocab.txt', 'w')
+def write_vocab_to_file(vocab, file_name):
+  vocab_file = open(file_name, 'w')
   for word in vocab:
     vocab_file.write(word + "\n")
   vocab_file.close()
@@ -76,17 +74,16 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_
     iter_number += 1
   return word_to_index, index_to_word
 
-def load_batched_data(file_name, word_to_index):
+def load_batched_data(file_name):
   if os.path.isfile(file_name) == True:
     batched_data = {}
     data_file = open(file_name, 'r')
     num_keys = int(data_file.readline())
-    for _ in range(0, num_keys):
-      print ("index " + str(_) + " out of " + str(num_keys))
+    for _ in range(num_keys):
       key = int(data_file.readline())
       num_caps = int(data_file.readline())
       batched_data[key] = []
-      for _ in range(0, num_caps):
+      for _ in range(num_caps):
         image = int(data_file.readline())
         caption = data_file.readline().split(',')
         caption = [int(i) for i in caption[:-1]]
@@ -111,7 +108,6 @@ def write_batched_data(batched_data, file_name):
 def batch_data(data_set, word_to_index, batch_size=1):
   batched_set = {}
   for i in range(len(data_set)):
-    #for i in range(1000):
     image, captions = data_set[i]
     for caption in captions:
       sentence = split_sentence(caption)
@@ -134,60 +130,78 @@ def image_to_variable(image):
     image = image.cuda()
   return autograd.Variable(image)
 
-def create_val_batch(training_set, word_to_index, num_captions, batch_size=1, randomize=False):
-    images = []
-    captions = []
-    max_length = 0
-    for _ in range(batch_size):
-        randInt = randint(0, len(training_set) - 1)
-        image, caption = training_set[randInt]
-        images.append(image)
-        sentence = split_sentence(caption[randint(0, num_captions - 1)])
-        # inserting and appending start of string and end of string tags
-        sentence.insert(0, "SOS")
-        sentence.append("EOS")
-        captions.append([get_index(word, word_to_index) for word in sentence])
-        if len(sentence) > max_length:
-            max_length = len(sentence)
-    for _ in range(batch_size):
-        while len(captions[_]) < max_length:
-            captions[_].append(get_index("EOS", word_to_index))
-    images = image_to_variable(torch.stack(images, 0))
-    return images, captions
-
 # returns images in a stored tensor, captions are just in a list, need to format to input or output manually
-def create_batch(image_set, batched_data, word_to_index, num_captions, batch_size=1, randomize=False):
+def create_data_batch(image_set, batched_data, word_to_index, batch_size=1, randomize=False):
   images = []
   captions = []
   index = random.choice(batched_data.keys())
   data_set = batched_data[index]
-  random.shuffle(data_set)
-  image_caption_set = data_set[0:32]
+  #print(len(data_set))
+  image_caption_set = random.sample(data_set, batch_size)
+  #random.shuffle(data_set)
+  #image_caption_set = data_set[0:batch_size]
   for image_caption in image_caption_set:
     image, _ = image_set[image_caption[0]]
     images.append(image)
     captions.append(image_caption[1])
   images = image_to_variable(torch.stack(images, 0))
+  #print(captions[0])
+  #print(len(captions))
   return images, captions
 
-# remember to take EOS token from input
+def create_input_batch_images(image_set, image_indices):
+  images = [image_set[i][0] for i in image_indices]
+  return image_to_variable(torch.stack(images, 0)) 
+
 def create_input_batch_captions(captions):
   inputs = []
   for caption in captions:
-    inputs.append(caption[:-1])
+    # strip the EOS token if it is there
+    if len(caption) > 1:
+      inputs.append(caption[:-1])
+    else:
+      inputs.append(caption)
   return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(inputs))
+
+def group_data(dataset, batch_size):
+  grouped_set = []
+  for i in range(len(dataset) / batch_size - 1):
+    grouped_set.append(dataset[i * batch_size : (i + 1) * batch_size])
+  return grouped_set
 
 # targets are a long vector, flatten them out
 # remember to take SOS token from targets
+# remember to go b1w1, b2,w1, b3,w1
 def create_target_batch_captions(captions):
   targets = []
-  for caption in captions: 
-    for word_index in caption[1:]:
-      targets.append(word_index)
+  '''
+  for i in range(1, len(captions[0])):
+    targets.extend([captions[j][i] for j in range(len(captions))])
+  '''
+  for caption in captions:
+    targets += caption[1:]
   return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
 
 def get_index(word, word_to_index):
   return word_to_index[word] if word in word_to_index else word_to_index["UNK"]
 
 def split_sentence(sentence):
-    return re.findall(r"[\w']+|[.,!?;]", sentence.lower())
+  remove_punctuation_map = dict((ord(char), None) for char in string.punctuation)
+  sentence = sentence.translate(remove_punctuation_map)
+  return re.findall(r"[\w']+|[.,!?;]", sentence.lower())
+
+def caption_to_string(caption, index_to_word):
+  string_rep = ""
+  for word in caption:
+    if word != 1 and word != 2:
+      string_rep += index_to_word[word] + " "
+  return string_rep[:-1]
+
+# test thsi one out
+def get_all_captions(image_index, data_set):
+  captions = []
+  for key in data_set.keys():
+    for image_caption_set in data_set[key]:
+      if image_caption_set[0] == image_index:
+        captions.append(image_caption_set[1])
+  return captions
