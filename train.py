@@ -8,7 +8,7 @@ import torch.autograd as autograd
 import torchvision.models as models
 import sys
 import random
-from tqdm import trange
+from tqdm import tqdm
 import data_loader
 import file_namer
 import param_parser
@@ -121,58 +121,50 @@ if checkpoint_name is not None:
 ## Every 1000 training batches we compute the average of 100 validate batches
 ## Every time we finish the training set we compute the average of the validate set
 '''
-progress_bar = trange(start_epoch, num_epochs)
-progress_bar.set_description('Epoch %i (Train)' % start_epoch)
-progress_bar.set_postfix(epoch=start_epoch, loss=0, index=index)
-for epoch in progress_bar: #range(start_epoch, num_epochs):
-  # shuffle data set
-  train_keys = batched_train_set.keys()
-  val_keys = batched_val_set.keys()
-  data_set = []
-  # ensuring each batch is full
-  for train_key in random.sample(train_keys, len(train_keys)):
-    train_key_set = random.sample(batched_train_set[train_key], len(batched_train_set[train_key]))
-    data_set.extend(data_loader.group_data(train_key_set, batch_size))
-  random.shuffle(data_set)
-  train_sum_loss = 0
-  #print("training eopch " + str(epoch) + " of " + str(num_epochs))
-  for image_caption_set in data_set:
-    index += 1
-    model.train()
-    loss = trainer.train_model(encoder_cnn, model, loss_function, optimizer, image_caption_set, train_set, grad_clip)
-    train_sum_loss += loss
-    # record loss
-    if index % 100 == 0:
-      output_train_file.write(str(index) + "," + str(train_sum_loss / 100) + "\n")
-      train_sum_loss = 0
-      progress_bar.set_description('Epoch %i (Train)' % epoch)
-      progress_bar.set_postfix(loss=(train_sum_loss / 100), index=index, out_of=(len(data_set) * num_epochs))
-      # run a random validation sample
-      if index % 1000 == 0:
-        val_sum_loss = 0
-        model.eval()
-        for i in range(100):
-          val_sum_loss += trainer.eval_model_random(encoder_cnn, model, loss_function, val_set, batched_val_set, word_to_index, batch_size=batch_size)
-        val_sum_loss = val_sum_loss / 100
-        output_val_file.write(str(index) + "," + str(val_sum_loss) + "\n")
-        progress_bar.set_description('Epoch %i (Train/Val)' % epoch)
-        progress_bar.set_postfix(loss=(val_sum_loss / 100), index=index, out_of=(len(data_set) * num_epochs))
-  val_sum_loss = 0
-  num_trials = 0
-  # run an entire validation batch
-  output_val_file.write("End of Epoch \n")
-  for val_key in random.sample(val_keys, len(val_keys)):
-    val_key_set = random.sample(batched_val_set[val_key], len(batched_val_set[val_key]))
-    model.eval()
-    data_set = data_loader.group_data(val_key_set, batch_size)
+data_set = data_loader.shuffle_data_set(batched_train_set, batch_size)
+with tqdm(total=len(data_set) * num_epochs + 1) as progress_bar:
+  progress_bar.set_description('Epoch %i (Train)' % start_epoch)
+  for epoch in range(start_epoch, num_epochs):
+    train_sum_loss = 0
     for image_caption_set in data_set:
-      loss = trainer.eval_model(encoder_cnn, model, loss_function, image_caption_set, val_set)
-      val_sum_loss += loss
-      num_trials += 1
-      if num_trials % 100 == 0:
-        progress_bar.set_description('Epoch %i (Val)' % epoch)
-        progress_bar.set_postfix(loss=(val_sum_loss / num_trials), trial_number=num_trials, out_of=len(data_set))
-  output_val_file.write(str(index) + "," + str(val_sum_loss / num_trials) + "\n")
+      index += 1
+      model.train()
+      train_sum_loss += trainer.train_model(encoder_cnn, model, loss_function, optimizer, image_caption_set, train_set, grad_clip)
+      # record loss
+      if index % 100 == 0:
+        output_train_file.write(str(index) + "," + str(train_sum_loss / 100) + "\n")
+        progress_bar.set_postfix(epoch=epoch, loss=(train_sum_loss / 100), index=index)
+        progress_bar.update(100)
+        train_sum_loss = 0
+        # run a random validation sample
+        if index % 1000 == 0:
+          val_sum_loss = 0
+          model.eval()
+          for i in range(100):
+            val_sum_loss += trainer.eval_model_random(encoder_cnn, model, loss_function, val_set, batched_val_set, word_to_index, batch_size=batch_size)
+          output_val_file.write(str(index) + "," + str(val_sum_loss / 100) + "\n")
+    tqdm.write("rebatching for epoch " + str(epoch))
+    if epoch != num_epochs + 1:
+      data_set = data_loader.shuffle_data_set(batched_train_set, batch_size)
+
+    # run an entire validation batch
+    tqdm.write("validating epoch " + str(epoch))
+    val_sum_loss = 0
+    num_trials = 0
+    output_val_file.write("End of Epoch \n")
+    val_keys = batched_val_set.keys()
+    for val_key in random.sample(val_keys, len(val_keys)):
+      val_key_set = random.sample(batched_val_set[val_key], len(batched_val_set[val_key]))
+      model.eval()
+      data_set = data_loader.group_data(val_key_set, batch_size)
+      for image_caption_set in data_set:
+        loss = trainer.eval_model(encoder_cnn, model, loss_function, image_caption_set, val_set)
+        val_sum_loss += loss
+        num_trials += 1
+        if num_trials % 100 == 0:
+          progress_bar.set_description('Epoch %i (Val)' % epoch)
+          progress_bar.set_postfix(loss=(val_sum_loss / num_trials), trial_number=num_trials, out_of=len(data_set))
+    output_val_file.write(str(index) + "," + str(val_sum_loss / num_trials) + "\n")
 
 output_train_file.close()
 output_val_file.close()

@@ -197,11 +197,11 @@ def caption_to_string(caption, index_to_word):
       string_rep += index_to_word[word] + " "
   return string_rep[:-1]
 
-# test thsi one out
-def get_all_captions(image_index, data_set):
-  captions = []
-  for key in data_set.keys():
-    for image_caption_set in data_set[key]:
-      if image_caption_set[0] == image_index:
-        captions.append(image_caption_set[1])
-  return captions
+def shuffle_data_set(batched_data_set, batch_size):
+  data_set = []
+  keys = batched_data_set.keys()
+  for key in random.sample(keys, len(keys)):
+    key_set = random.sample(batched_data_set[key], len(batched_data_set[key]))
+    data_set.extend(group_data(key_set, batch_size))
+  random.shuffle(data_set)
+  return data_set
