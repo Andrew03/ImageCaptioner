@@ -6,7 +6,6 @@ class EncoderCNN(nn.Module):
   def __init__(self, isNormalized=False):
     super(EncoderCNN, self).__init__()
     vgg16 = models.vgg16_bn(pretrained=True) if isNormalized else models.vgg16(pretrained=True)
-    print("using normalized" if isNormalized else "not normalized")
     if torch.cuda.is_available():
       vgg16.cuda()
     # removing dropout and classification layer

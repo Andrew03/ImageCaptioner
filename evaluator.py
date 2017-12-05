@@ -9,11 +9,9 @@ import data_loader
 def create_predict_batch(training_data, batched_data, batch_size=1):
   data_set = batched_data[random.choice(batched_data.keys())]
   image_caption = data_set[randint(0, len(data_set) - 1)]
-  image, _ = training_data[image_caption[0]]
-  images = [image for i in range(batch_size)]
-  captions = [image_caption[1] for i in range(batch_size)] if batch_size > 1 else image_caption[1]
-  images = data_loader.image_to_variable(torch.stack(images, 0))
-  return images, captions
+  image, caption = training_data[image_caption[0]]
+  images = data_loader.image_to_variable(torch.stack([image], 0))
+  return images, image_caption[0], caption
 
 def create_predict_input_captions(captions):
   return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(captions))

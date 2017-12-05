@@ -15,7 +15,6 @@ def train_model(cnn, lstm, loss_function, optimizer, image_caption_set, image_da
   loss = loss_function(caption_scores, target_captions)
   loss.backward()
   nn.utils.clip_grad_norm(lstm.parameters(), max_grad)
-  # tried at 3 for first runs, 1 only for last one
   optimizer.step()
   return loss.data.select(0, 0)
 

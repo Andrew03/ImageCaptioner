@@ -196,3 +196,12 @@ def caption_to_string(caption, index_to_word):
     if word != 1 and word != 2:
       string_rep += index_to_word[word] + " "
   return string_rep[:-1]
+
+# test thsi one out
+def get_all_captions(image_index, data_set):
+  captions = []
+  for key in data_set.keys():
+    for image_caption_set in data_set[key]:
+      if image_caption_set[0] == image_index:
+        captions.append(image_caption_set[1])
+  return captions
