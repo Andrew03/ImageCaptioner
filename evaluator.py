@@ -26,9 +26,13 @@ def beam_search(cnn, lstm, images, beam_size=1):
   lstm(cnn(images))
   # creating intial input batch
   input_captions = create_predict_input_captions([1])
-  initial_score = lstm(input_captions).data[0]
+  initial_score, initial_proabilities = lstm(input_captions).data[0]
   # getting top scores
   top_indices = zip(*heapq.nlargest(beam_size, enumerate(initial_score), key=operator.itemgetter(1)))[0]
+  step_score = 0
+  for score_index in top_indices:
+    step_score += initial_probabilities[score_index]
+  print(step_score)
   # updating best phrases
   best_phrases = [[best_phrases[0][0] + initial_score[score_index], best_phrases[0][1] + [score_index]] for score_index in top_indices]
   # getting next batch of inputs

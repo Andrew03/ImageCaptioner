@@ -11,10 +11,10 @@ class EncoderCNN(nn.Module):
     # removing dropout and classification layer
     modules = list(vgg16.children())
     self.pooling_layer = modules[0]
-    self.classify_layer = nn.Sequential(*(modules[1][i] for i in range(6) if (i + 1) % 3 != 0))
+    self.classify_layer = nn.Sequential(*(modules[1][i] for i in range(4) if (i + 1) % 3 != 0))
 
   def forward(self, images):
     features = self.pooling_layer(images)
     (_, C, H, W) = features.data.size()
     features = features.view( -1 , C * H * W)
-    return self.classify_layer(features)
+    return self.classify_layer(features).unsqueeze(0)

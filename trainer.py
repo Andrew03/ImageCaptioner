@@ -11,7 +11,7 @@ def train_model(cnn, lstm, loss_function, optimizer, image_caption_set, image_da
   lstm.zero_grad()
   lstm.hidden = lstm.init_hidden()
   lstm(image_features)
-  caption_scores = lstm(input_captions)
+  caption_scores, _ = lstm(input_captions)
   loss = loss_function(caption_scores, target_captions)
   loss.backward()
   nn.utils.clip_grad_norm(lstm.parameters(), max_grad)
@@ -26,7 +26,7 @@ def eval_model(cnn, lstm, loss_function, image_caption_set, image_data_set):
   lstm.eval()
   lstm.hidden = lstm.init_hidden()
   lstm(image_features)
-  caption_scores = lstm(input_captions)
+  caption_scores, _ = lstm(input_captions)
   return loss_function(caption_scores, target_captions).data.select(0, 0)
 
 def eval_model_random(cnn, lstm, loss_function, image_set, batched_data_set, word_to_index, batch_size=1):
@@ -37,5 +37,5 @@ def eval_model_random(cnn, lstm, loss_function, image_set, batched_data_set, wor
   lstm.eval()
   lstm.hidden = lstm.init_hidden()
   lstm(image_features)
-  caption_scores = lstm(input_captions)
+  caption_scores, _ = lstm(input_captions)
   return loss_function(caption_scores, target_captions).data.select(0, 0)

@@ -9,7 +9,6 @@ class LSTM(nn.Module):
     self.hidden_dim = hidden_dim
     self.word_embedding_layer = nn.Embedding(vocab_size, embedding_dim)
     self.image_embedding_layer = nn.Linear(4096, embedding_dim)
-    #nn.init.xavier_normal(self.image_embedding_layer.weight)
     self.lstm = nn.LSTM(embedding_dim, hidden_dim)
     self.dropout = nn.Dropout(p=dropout)
     self.embedding_dim = embedding_dim
@@ -25,16 +24,6 @@ class LSTM(nn.Module):
     else:
       return (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(dtype),
         autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(dtype))
-    '''
-    if batch_size:
-      return (autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor),
-        autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor)) if torch.cuda.is_available() else (autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.FloatTensor),
-        autograd.Variable(torch.zeros(1, batch_size, self.hidden_dim)).type(torch.FloatTensor))
-    else:
-      return (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor),
-        autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.cuda.FloatTensor)) if torch.cuda.is_available() else (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.FloatTensor),
-        autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)).type(torch.FloatTensor))
-    '''
 
   def forward(self, batch):
     is_word = type(batch.data) == torch.cuda.LongTensor or type(batch.data) == torch.LongTensor
@@ -42,8 +31,8 @@ class LSTM(nn.Module):
     embed_value = self.dropout(embed_value)
     # is this line correct? do i need to format hidden?
     lstm_out, self.hidden = self.lstm(
-      embed_value.view(-1, len(batch), self.embedding_dim), self.hidden)
+      embed_value.view(-1, len(batch), self.embedding_dim), self.hidden) if is_word else self.lstm(embed_value)
     lstm_out = self.dropout(lstm_out)
     words_space = self.hidden2word(lstm_out.view(-1, self.hidden_dim))
     words_score = F.log_softmax(words_space)
-    return words_score
+    return words_score, F.softmax(words_space)
