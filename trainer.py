@@ -10,7 +10,7 @@ def train_model(cnn, lstm, loss_function, optimizer, image_caption_set, image_da
   lstm.train()
   lstm.zero_grad()
   lstm.hidden = lstm.init_hidden()
-  lstm(image_features)
+  lstm(image_features.unsqueeze(0))
   caption_scores = lstm(input_captions)
   loss = loss_function(caption_scores, target_captions)
   loss.backward()
