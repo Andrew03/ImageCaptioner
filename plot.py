@@ -43,9 +43,9 @@ elif len(sys.argv) == 3:
           val_loss.append(number_value[1])
           val_trial.append(number_value[0])
 
-plt.plot(train_trial, train_loss, 'ro', markerSize=1)
-plt.plot(val_trial, val_loss, 'bo', markerSize=5)
-plt.plot(epoch_trial, epoch_loss, 'bo', markerSize=10)
+plt.plot(train_trial, train_loss, 'ro', markersize=1)
+plt.plot(val_trial, val_loss, 'bo', markersize=3)
+plt.plot(epoch_trial, epoch_loss, 'bo', markersize=5)
 plt.xlabel('trials')
 plt.ylabel('loss')
 plt.title('loss over trials')
