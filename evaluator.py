@@ -6,17 +6,17 @@ import random
 from random import randint
 import data_loader
 
-def create_predict_batch(training_data, batched_data, batch_size=1):
+def create_predict_batch(training_data, batched_data, batch_size=1, useCuda=True):
   data_set = batched_data[random.choice(batched_data.keys())]
   image_caption = data_set[randint(0, len(data_set) - 1)]
   image, caption = training_data[image_caption[0]]
-  images = data_loader.image_to_variable(torch.stack([image], 0))
+  images = data_loader.image_to_variable(torch.stack([image], 0), useCuda)
   return images, image_caption[0], caption
 
-def create_predict_input_captions(captions):
-  return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(captions))
+def create_predict_input_captions(captions, useCuda=True):
+  return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(captions))
 
-def beam_search(cnn, lstm, images, beam_size=1):
+def beam_search(cnn, lstm, images, beam_size=1, useCuda=True):
   lstm.eval()
   best_phrases = [[0, []] for i in range(beam_size)]
   completed_phrases = []
@@ -25,22 +25,25 @@ def beam_search(cnn, lstm, images, beam_size=1):
   lstm.hidden = lstm.init_hidden(1)
   lstm(cnn(images))
   # creating intial input batch
-  input_captions = create_predict_input_captions([1])
-  initial_score, initial_proabilities = lstm(input_captions).data[0]
+  input_captions = create_predict_input_captions([1], useCuda)
+  #initial_score, initial_proabilities = lstm(input_captions).data[0]
+  initial_score = lstm(input_captions)[0].data[0]
+  #initial_score = lstm(input_captions)
+  #print(initial_score)
   # getting top scores
   top_indices = zip(*heapq.nlargest(beam_size, enumerate(initial_score), key=operator.itemgetter(1)))[0]
-  step_score = 0
-  for score_index in top_indices:
-    step_score += initial_probabilities[score_index]
-  print(step_score)
+  #step_score = 0
+  #for score_index in top_indices:
+  #  step_score += initial_probabilities[score_index]
+  #print(step_score)
   # updating best phrases
   best_phrases = [[best_phrases[0][0] + initial_score[score_index], best_phrases[0][1] + [score_index]] for score_index in top_indices]
   # getting next batch of inputs
-  next_captions = create_predict_input_captions(list(top_indices))
+  next_captions = create_predict_input_captions(list(top_indices), useCuda)
   lstm.hidden = (lstm.hidden[0].repeat(1, beam_size, 1), lstm.hidden[1].repeat(1, beam_size, 1))
   while index < 20:
     index += 1
-    scores = lstm(next_captions).data
+    scores = lstm(next_captions)[0].data
     best_candidates = []
     for i in range(len(best_phrases)):
       score = scores[i]
@@ -57,7 +60,7 @@ def beam_search(cnn, lstm, images, beam_size=1):
       return completed_phrases
     best_phrases = [[phrase[0], phrase[1]] for phrase in best_candidates]
     next_captions = [[phrase[1][-1]] for phrase in best_phrases]
-    next_captions = create_predict_input_captions(next_captions)
+    next_captions = create_predict_input_captions(next_captions, useCuda)
     lstm.hidden = (torch.stack([lstm.hidden[0][0].select(0, phrase[2]) for phrase in best_candidates]),
       torch.stack([lstm.hidden[1][0].select(0, phrase[2]) for phrase in best_candidates]))
     lstm.hidden = (lstm.hidden[0].unsqueeze(0), lstm.hidden[1].unsqueeze(0))

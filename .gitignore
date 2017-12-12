@@ -4,3 +4,4 @@ notifications/*
 *.swp
 model/*
 *.txt
+checkpoints/*

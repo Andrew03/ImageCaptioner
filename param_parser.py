@@ -14,8 +14,9 @@ def parse_train_params(file_name):
     num_epochs = int(params[7].split(" ")[1])
     grad_clip = int(params[8].split(" ")[1])
     isNormalized = params[9].split(" ")[1] == "True"
+    useCuda = params[10].split(" ")[1] == "True"
     return min_occurrences, batch_size, embedding_dim, hidden_size, dropout, \
-      model_lr, encoder_lr, num_epochs, grad_clip, isNormalized
+      model_lr, encoder_lr, num_epochs, grad_clip, isNormalized, useCuda
   else:
     print("file name is invalid")
     return None 
@@ -34,8 +35,9 @@ def parse_run_params(file_name):
     grad_clip = int(params[8].split(" ")[1])
     num_runs = int(params[9].split(" ")[1])
     isNormalized = params[10].split(" ")[1] == "True"
+    useCuda = params[11].split(" ")[1] == "True"
     return min_occurrences, batch_size, embedding_dim, hidden_size, dropout, \
-      model_lr, encoder_lr, num_epochs, grad_clip, num_runs, isNormalized
+      model_lr, encoder_lr, num_epochs, grad_clip, num_runs, isNormalized, useCuda
   else:
     print("file name is invalid")
     return None 

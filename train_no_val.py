@@ -55,7 +55,6 @@ transform = transforms.Compose([
 '''
 # loading the data sets
 train_set = data_loader.load_data(images='data/train2014', annotations='data/annotations/captions_train2014.json', transform=transform)
-val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
 # loads the vocabulary 
 word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name(min_occurrences))
 if word_to_index is None:
@@ -63,8 +62,7 @@ if word_to_index is None:
   sys.exit()
 # loads the batched data
 batched_train_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=True))
-batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
-if batched_train_set is None or batched_val_set is None:
+if batched_train_set is None:
   print("run the setup script to batch the data")
   sys.exit()
 
@@ -77,6 +75,7 @@ model = model.DecoderRNN(embedding_dim, hidden_size, len(word_to_index), batch_s
 if torch.cuda.is_available() and useCuda:
   model.cuda()
 loss_function = nn.NLLLoss()
+sys.exit()
 # weight decay parameter adds L2
 optimizer = optim.Adam([
   {'params': model.word_embedding_layer.parameters()},
@@ -93,10 +92,6 @@ output_train_file_name = file_namer.make_output_name(batch_size, min_occurrences
   num_epochs, dropout, model_lr, encoder_lr, embedding_dim, hidden_size, \
   grad_clip, isTrain=True, isNormalized=isNormalized)
 output_train_file = open(output_train_file_name, 'w')
-output_val_file_name = file_namer.make_output_name(batch_size, min_occurrences, \
-  num_epochs, dropout, model_lr, encoder_lr, embedding_dim, hidden_size, \
-  grad_clip, isTrain=False, isNormalized=isNormalized)
-output_val_file = open(output_val_file_name, 'w')
 
 index = 0
 start_epoch = 0
@@ -126,10 +121,6 @@ if checkpoint_name is not None:
   model.load_state_dict(checkpoint['state_dict'])
   optimizer.load_state_dict(checkpoint['optimizer'])
 '''
-# calculating the number of points in the validation set
-len_batched_val = 0
-for val_key in batched_val_set.keys():
-  len_batched_val += len(batched_val_set[val_key]) / 100
   
 '''
 ## Training Design
@@ -149,34 +140,9 @@ for epoch in range(start_epoch, num_epochs):
     if index % 100 == 0:
       output_train_file.write(str(index) + "," + str(train_sum_loss / 100) + "\n")
       train_sum_loss = 0
-      # run a random validation sample
-      if index % 1000 == 0:
-        progress_bar.set_description('Epoch %i (Train/Val)' % epoch)
-        val_sum_loss = 0
-        for i in range(100):
-          val_sum_loss += trainer.eval_model_random(encoder_cnn, model, loss_function, val_set, batched_val_set, word_to_index, batch_size, useCuda)
-          progress_bar.set_postfix(loss=val_sum_loss / (i+1))
-        output_val_file.write(str(index) + "," + str(val_sum_loss / 100) + "\n")
-      progress_bar.set_description('Epoch %i (Train)' % epoch)
-
-  # run an entire validation batch
-  output_val_file.write("End of Epoch \n")
-  val_data_set = data_loader.shuffle_data_set(batched_val_set, batch_size)
-  progress_bar = tqdm(val_data_set)
-  progress_bar.set_description('Epoch %i (Val)' % epoch)
-  val_sum_loss = 0
-  num_trials = 0
-  for image_caption_set in progress_bar:
-    val_sum_loss += trainer.eval_model(encoder_cnn, model, loss_function, image_caption_set, val_set, useCuda)
-    num_trials += 1
-    progress_bar.set_postfix(loss=val_sum_loss / num_trials)
-  output_val_file.write(str(index) + "," + str(val_sum_loss / num_trials) + "\n")
   torch.save({'epoch': epoch + 1,
               'index': index,
               'state_dict': model.state_dict(),
-              'optimizer': optimizer.state_dict()}, file_namer.make_checkpoint_name(batch_size, \
-                min_occurrences, epoch + 1, dropout, model_lr, encoder_lr, embedding_dim, \
-                hidden_size, grad_clip, isNormalized))
+              'optimizer': optimizer.state_dict()}, 'checkpoints/test_' + str(epoch + 1) + '.pt')
 
 output_train_file.close()
-output_val_file.close()
