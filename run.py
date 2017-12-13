@@ -30,7 +30,7 @@ num_epochs = params[7]
 grad_clip = params[8]
 num_runs = params[9]
 isNormalized = params[10]
-useCuda = params[11]
+useCuda = params[11] and torch.cuda.is_available()
 
 # defining image size
 transform = transforms.Compose([
@@ -59,11 +59,9 @@ batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch
 ## Creating the Model
 ## Instantiate the encoder and lstm and loss function
 '''
-#encoder_cnn = EncoderCNN(isNormalized)
 encoder_cnn = model.EncoderCNN(isNormalized, useCuda)
-#model = LSTM(embedding_dim, hidden_size, len(word_to_index), batch_size, dropout=dropout)
 model = model.DecoderRNN(embedding_dim, hidden_size, len(word_to_index), batch_size, dropout, useCuda)
-if torch.cuda.is_available() and useCuda:
+if useCuda:
   model.cuda()
 loss_function = nn.NLLLoss()
 
@@ -71,23 +69,19 @@ loss_function = nn.NLLLoss()
 ## Loading Checkpoint
 ## Loads the model from the checkpoint specified in run parameters
 '''
-'''
 checkpoint_name = file_namer.make_checkpoint_name(batch_size, min_occurrences, num_epochs, dropout, \
   model_lr, encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized)
-checkpoint_name = checkpoint_name.replace("checkpoint", "model")
 if not os.path.isfile(checkpoint_name):
   print("Invalid run parameters!")
   print("Checkpoint " + str(checkpoint_name) + " does not exist!")
   sys.exit()
-'''
-checkpoint = torch.load('checkpoints/test_7.pt')
+checkpoint = torch.load(checkpoint_name) if useCuda else torch.load(checkpoint_name, map_location=lambda storage, loc: storage)
 model.load_state_dict(checkpoint['state_dict'])
 
 initial_word = ""
 model.eval()
 for epoch in range(num_runs):
-  model.hidden = model.init_hidden(5)
-  image, image_index, captions = evaluator.create_predict_batch(val_set, batched_val_set, 5, useCuda)
+  image, image_index, captions = evaluator.create_predict_batch(val_set, batched_val_set, useCuda)
   prediction = evaluator.beam_search(encoder_cnn, model, image, beam_size=10, useCuda=useCuda)
   for caption in prediction:
     print("score is: " + str(caption[0]) + ", caption is: " + data_loader.caption_to_string(caption[1], index_to_word))

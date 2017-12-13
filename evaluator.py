@@ -6,7 +6,7 @@ import random
 from random import randint
 import data_loader
 
-def create_predict_batch(training_data, batched_data, batch_size=1, useCuda=True):
+def create_predict_batch(training_data, batched_data, useCuda=True):
   data_set = batched_data[random.choice(batched_data.keys())]
   image_caption = data_set[randint(0, len(data_set) - 1)]
   image, caption = training_data[image_caption[0]]
@@ -18,7 +18,7 @@ def create_predict_input_captions(captions, useCuda=True):
 
 def beam_search(cnn, lstm, images, beam_size=1, useCuda=True):
   lstm.eval()
-  best_phrases = [[0, []] for i in range(beam_size)]
+  #best_phrases = [[0, []] for i in range(beam_size)]
   completed_phrases = []
   index = 0
   # intializing hidden state with image
@@ -26,31 +26,30 @@ def beam_search(cnn, lstm, images, beam_size=1, useCuda=True):
   lstm(cnn(images))
   # creating intial input batch
   input_captions = create_predict_input_captions([1], useCuda)
-  #initial_score, initial_proabilities = lstm(input_captions).data[0]
-  initial_score = lstm(input_captions)[0].data[0]
-  #initial_score = lstm(input_captions)
-  #print(initial_score)
+  initial_scores, initial_probabilities = lstm(input_captions)
   # getting top scores
-  top_indices = zip(*heapq.nlargest(beam_size, enumerate(initial_score), key=operator.itemgetter(1)))[0]
-  #step_score = 0
-  #for score_index in top_indices:
-  #  step_score += initial_probabilities[score_index]
-  #print(step_score)
+  top_scores, top_indices = initial_scores.topk(beam_size)
+  step_score = 0
+  top_probs, _ = initial_probabilities.topk(beam_size)
+  for score in top_probs[0].data:
+    step_score += score
+  print(step_score)
   # updating best phrases
-  best_phrases = [[best_phrases[0][0] + initial_score[score_index], best_phrases[0][1] + [score_index]] for score_index in top_indices]
+  best_phrases = [[top_scores[0].data[i], [top_indices[0].data[i]]] for i in range(beam_size)]
   # getting next batch of inputs
-  next_captions = create_predict_input_captions(list(top_indices), useCuda)
+  next_captions = top_indices.resize(beam_size, 1)
   lstm.hidden = (lstm.hidden[0].repeat(1, beam_size, 1), lstm.hidden[1].repeat(1, beam_size, 1))
   while index < 20:
     index += 1
-    scores = lstm(next_captions)[0].data
+    scores, probabilities = lstm(next_captions)
     best_candidates = []
+    top_scores, top_indices = scores.topk(beam_size)
+    len_phrases = len(best_phrases[0][1])
     for i in range(len(best_phrases)):
-      score = scores[i]
-      top_indices = zip(*heapq.nlargest(beam_size, enumerate(score), key=operator.itemgetter(1)))[0]
-      best_candidates.extend([[(best_phrases[i][0] * len(best_phrases[i][1]) + score[score_index]) / (len(best_phrases[i][1]) + 1),
-        best_phrases[i][1] + [score_index],
-        i] for score_index in top_indices])
+      for j in range(beam_size):
+        best_candidates.extend([[(best_phrases[i][0] * len_phrases + top_scores[i].data[j]) / (len_phrases + 1),
+          best_phrases[i][1] + [top_indices[i].data[j]],
+          i]])
     best_candidates = sorted(best_candidates, key=lambda score_caption: score_caption[0])[-beam_size:]
     for phrase in best_candidates:
       if phrase[1][-1] == 2:

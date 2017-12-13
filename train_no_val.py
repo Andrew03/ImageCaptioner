@@ -75,7 +75,6 @@ model = model.DecoderRNN(embedding_dim, hidden_size, len(word_to_index), batch_s
 if torch.cuda.is_available() and useCuda:
   model.cuda()
 loss_function = nn.NLLLoss()
-sys.exit()
 # weight decay parameter adds L2
 optimizer = optim.Adam([
   {'params': model.word_embedding_layer.parameters()},
@@ -143,6 +142,6 @@ for epoch in range(start_epoch, num_epochs):
   torch.save({'epoch': epoch + 1,
               'index': index,
               'state_dict': model.state_dict(),
-              'optimizer': optimizer.state_dict()}, 'checkpoints/test_' + str(epoch + 1) + '.pt')
+              'optimizer': optimizer.state_dict()}, 'checkpoints/test_new_targets' + str(epoch + 1) + '.pt')
 
 output_train_file.close()

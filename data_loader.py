@@ -169,12 +169,12 @@ def group_data(dataset, batch_size):
 # remember to go b1w1, b2,w1, b3,w1
 def create_target_batch_captions(captions, useCuda=True):
   targets = []
-  '''
   for i in range(1, len(captions[0])):
     targets.extend([captions[j][i] for j in range(len(captions))])
   '''
   for caption in captions:
     targets += caption[1:]
+  '''
   return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(targets))
 
 def get_index(word, word_to_index):
