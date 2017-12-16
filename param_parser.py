@@ -37,10 +37,11 @@ def parse_run_params(file_name):
     grad_clip = int(params[8].split(" ")[1])
     num_runs = int(params[9].split(" ")[1])
     beam_size = int(params[10].split(" ")[1])
-    isNormalized = params[11].split(" ")[1] == "True"
-    useCuda = params[12].split(" ")[1] == "True"
-    return min_occurrences, batch_size, embedding_dim, hidden_size, dropout, \
-      decoder_lr, encoder_lr, num_epochs, grad_clip, num_runs, beam_size, isNormalized, useCuda
+    printStepProb = params[11].split(" ")[1] == "True"
+    isNormalized = params[12].split(" ")[1] == "True"
+    useCuda = params[13].split(" ")[1] == "True"
+    return min_occurrences, batch_size, embedding_dim, hidden_size, dropout, decoder_lr, \
+      encoder_lr, num_epochs, grad_clip, num_runs, beam_size, printStepProb, isNormalized, useCuda
   else:
     print("file name is invalid")
     return None 

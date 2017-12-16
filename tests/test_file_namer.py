@@ -9,8 +9,6 @@ class TestFileNamer(unittest.TestCase):
 
   def setUp(self):
     self.checkpoints = ("tests/model_batch_10_occurrence_5_epoch_10_dropout_0.0_dim_512x512_clip_5_isnorm",
-        "tests/model_batch_10_occurrence_5_epoch_10_dropout_0.0_dim_512x512_clip_5_nonorm",
-        "tests/model_batch_10_occurrence_5_epoch_1_dropout_0.0_dim_512x512_clip_5_isnorm",
         "tests/model_batch_10_occurrence_5_epoch_1_dropout_0.0_dim_512x512_clip_5_nonorm")
     for checkpoint in self.checkpoints:
       checkpoint_file = open(checkpoint, "w")
@@ -32,16 +30,10 @@ class TestFileNamer(unittest.TestCase):
   def test_make_output_name(self):
     expected = "output/train_batch_10_occurrence_5_epoch_10_dropout_0.0_decoderLR_0.001_encoderLR_0.001_dim_512x512_clip_5_nonorm.txt"
     test_helper.test_equal(self, expected, file_namer.make_output_name,
-      "Incorrect Train Output Not Normalized Name", 10, 5, 10, 0.0, 0.001, 0.001, 512, 512, 5, True, False)
-    expected = "output/val_batch_10_occurrence_5_epoch_10_dropout_0.0_decoderLR_0.001_encoderLR_0.001_dim_512x512_clip_5_nonorm.txt"
-    test_helper.test_equal(self, expected, file_namer.make_output_name,
-      "Incorrect Val Output Not Normalized Name", 10, 5, 10, 0.0, 0.001, 0.001, 512, 512, 5, False, False)
-    expected = "output/train_batch_10_occurrence_5_epoch_10_dropout_0.0_decoderLR_0.001_encoderLR_0.001_dim_512x512_clip_5_isnorm.txt"
-    test_helper.test_equal(self, expected, file_namer.make_output_name,
-      "Incorrect Train Output Normalized Name", 10, 5, 10, 0.0, 0.001, 0.001, 512, 512, 5, True, True)
+      "Incorrect Train Output Not Normalized Name", 10, 5, 10, 0.0, 0.001, 0.001, 512, 512, 5, False, True)
     expected = "output/val_batch_10_occurrence_5_epoch_10_dropout_0.0_decoderLR_0.001_encoderLR_0.001_dim_512x512_clip_5_isnorm.txt"
     test_helper.test_equal(self, expected, file_namer.make_output_name,
-      "Incorrect Val Output Normalized Name", 10, 5, 10, 0.0, 0.001, 0.001, 512, 512, 5, False, True)
+      "Incorrect Val Output Normalized Name", 10, 5, 10, 0.0, 0.001, 0.001, 512, 512, 5, True, False)
 
   def test_make_checkpoint_name(self):
     expected = "checkpoints/model_batch_10_occurrence_5_epoch_10_dropout_0.0_decoderLR_0.001_encoderLR_0.001_dim_512x512_clip_5_nonorm.pt"
@@ -63,6 +55,7 @@ class TestFileNamer(unittest.TestCase):
 
   def tearDown(self):
     for checkpoint in self.checkpoints:
+      os.remove(checkpoint)
 
 suite = unittest.TestLoader().loadTestsFromTestCase(TestFileNamer)
 unittest.TextTestRunner(verbosity=2).run(suite)

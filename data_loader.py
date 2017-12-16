@@ -9,46 +9,52 @@ import sys
 import string
 from random import randint
 
-def get_file_information():
-  image_dir = ""
-  annotation_dir = ""
-  while os.path.isdir(image_dir) == False:
-    print "image directory:",
-    image_dir = raw_input()
-  while os.path.isfile(annotation_dir) == False:
-    print "annotation directory:",
-    annotation_dir = raw_input()
-  build_vocab = os.path.isfile("vocab.txt") == False
-  if build_vocab == False:
-    vocab_input = ""
-    while vocab_input != "y" and vocab_input != "n":
-      print "rebuild vocabulary? (y/n)",
-      vocab_input = raw_input()
-    build_vocab = (vocab_input == "y")
-  return image_dir, annotation_dir, build_vocab
-
+'''
+# Loads the vocabulary
+Args:
+  file_name: The name of the vocabularly file
+Returns:         
+  List containing a word_to_index dictionary and a index_to_word list
+Raises:
+  IOError: File does not exist
+'''
 def load_vocab(file_name):
-  if os.path.isfile(file_name) == True:
-    vocab_file = open(file_name, 'r')
-    index_to_word = vocab_file.read().splitlines()
-    vocab_file.close()
-    word_to_index = {}
-    index = 0
-    for word in index_to_word:
-      word_to_index[word] = index
-      index += 1
-    return word_to_index, index_to_word
-  else:
-    return [None, None]
+  if not os.path.isfile(file_name):
+    raise IOError("File <" + file_name + "> does not exist")
+  vocab_file = open(file_name, 'r')
+  index_to_word = vocab_file.read().splitlines()
+  vocab_file.close()
+  word_to_index = {}
+  index = 0
+  for word in index_to_word:
+    word_to_index[word] = index
+    index += 1
+  return word_to_index, index_to_word
 
-# input the vocab that contains the words, i.e index_to_word
+'''
+# Writes the vocabulary to a file
+Args:
+  vocab: The index_to_word list mapping an index to a word
+  file_name: The name of the file to write the vocabulary to
+'''
 def write_vocab_to_file(vocab, file_name):
   vocab_file = open(file_name, 'w')
   for word in vocab:
     vocab_file.write(word + "\n")
   vocab_file.close()
 
-# assumes that data is in form of a two tuple, with captions as the second
+'''
+# Creates a vocabulary from the inputted data
+Args:
+  data: The data to build the vocabulary from in the form of a list of tuples, where
+        the caption is the second value in the tuple
+  min_occurrence: The minimum number of times a word must appear to be included
+  unknown_val: The integer to use to represent unknown words
+  end_of_seq_val: The integer to use to represent the end of a sequence
+  start_of_seq_val: The integer used to represent the start of a sequence
+Returns:
+  List containing a word_to_index dictionary and a index_to_word list
+'''
 def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_of_seq_val=2):
   word_to_index = {}
   index_to_word = []
@@ -59,10 +65,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_
   index_to_word.append("SOS")
   word_to_index["EOS"] = start_of_seq_val
   index_to_word.append("EOS")
-  iter_number = 0
   for _, captions in data:
-    if iter_number % 1000 == 0 and iter_number > 999:
-      print iter_number
     for sentence in captions:
       for word in split_sentence(sentence):
         if word not in word_to_appearences:
@@ -71,27 +74,44 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_
         if word_to_appearences[word] == min_occurrence:
           word_to_index[word] = len(index_to_word)
           index_to_word.append(word)
-    iter_number += 1
   return word_to_index, index_to_word
 
-def load_batched_data(file_name):
-  if os.path.isfile(file_name) == True:
-    batched_data = {}
-    data_file = open(file_name, 'r')
-    num_keys = int(data_file.readline())
-    for _ in range(num_keys):
-      key = int(data_file.readline())
-      num_caps = int(data_file.readline())
-      batched_data[key] = []
-      for _ in range(num_caps):
-        image = int(data_file.readline())
-        caption = data_file.readline().split(',')
-        caption = [int(i) for i in caption[:-1]]
-        batched_data[key].append([image, caption])
-    return batched_data
-  else:
-    return None
+'''
+# Loads the batched data set
+Args:
+  file_name: The name of the file containing the batched data
+Returns:
+  A dictionary containing the length of sequences as keys and a list of
+  sequences of that length as values
+  The sequences are integers made using the corresponding vocabulary
+Raises:
 
+'''
+def load_batched_data(file_name):
+  if not os.path.isfile(file_name):
+    raise IOError("File <" + file_name + "> does not exist")
+  batched_data = {}
+  data_file = open(file_name, 'r')
+  num_keys = int(data_file.readline())
+  for _ in range(num_keys):
+    key = int(data_file.readline())
+    num_caps = int(data_file.readline())
+    batched_data[key] = []
+    for _ in range(num_caps):
+      image = int(data_file.readline())
+      caption = data_file.readline().split(',')
+      caption = [int(i) for i in caption[:-1]]
+      batched_data[key].append([image, caption])
+  return batched_data
+
+'''
+# Writes the batched data set to a file
+Args:
+  batched_data: The batched data set, a dictionary containing the length of sequences
+                as keys and a list of sequences of that length as values
+                The sequences are integers made using the corresponding vocabulary
+  file_name: The name of the file to write the batched data set to
+'''
 def write_batched_data(batched_data, file_name):
   data_file = open(file_name, 'w')
   data_file.write(str(len(batched_data)) + "\n")
@@ -105,6 +125,19 @@ def write_batched_data(batched_data, file_name):
       data_file.write("\n")
   data_file.close()
 
+'''
+# Creates a batched data set from an unbatched data set
+Args:
+  data_set: The data set to build the batched data set from, comes in the form of
+            a list of tuples, where the caption is the second value in the tuple
+  word_to_index: The vocabulary, a list containing index to word mappings
+  batch_size: The minimum number of times a caption of the same length must appear
+              for it to be included in the batched data set
+Returns:
+  A dictionary containing the length of sequences as keys and a list of
+  sequences of that length as values
+  The sequences are integers made using the corresponding vocabulary
+'''
 def batch_data(data_set, word_to_index, batch_size=1):
   batched_set = {}
   for i in range(len(data_set)):
@@ -121,14 +154,31 @@ def batch_data(data_set, word_to_index, batch_size=1):
       del batched_set[i]
   return batched_set
 
+'''
+# Loads a data set using the MSCoCo API
+Args:
+  images: The directory containing the images of the data set
+  annotations: The directory containing the annotations of the data set
+  transform: The transformation to be applied onto the images
+Returns: 
+  The data set in the form of a list of tuples, where the image is the first value and
+  the caption is the second value in the tuple
+'''
 def load_data(images, annotations, transform):
   return datasets.CocoCaptions(root = images, annFile = annotations, transform = transform)
 
-# Needs an array of images
-def image_to_variable(image, useCuda=True):
+'''
+# Converts a list of images into a Variable object
+Args:
+  images: A list of images (to convert a single image, pass in a list containing just that image) 
+  useCuda: If True, returns a cuda Variable, otherwise returns a non-cuda Variable
+Returns:
+  A Variable containing the images
+'''
+def image_to_variable(images, useCuda=True):
   if torch.cuda.is_available() and useCuda:
-    image = image.cuda()
-  return autograd.Variable(image)
+    images = images.cuda()
+  return autograd.Variable(images)
 
 # returns images in a stored tensor, captions are just in a list, need to format to input or output manually
 def create_data_batch(image_set, batched_data, word_to_index, batch_size=1, randomize=False):

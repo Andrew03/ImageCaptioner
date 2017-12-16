@@ -57,15 +57,12 @@ transform = transforms.Compose([
 train_set = data_loader.load_data(images='data/train2014', annotations='data/annotations/captions_train2014.json', transform=transform)
 val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
 # loads the vocabulary 
-word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name(min_occurrences))
-if word_to_index is None:
-  print("run the setup script to create the vocab")
-  sys.exit()
-# loads the batched data
-batched_train_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=True))
-batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
-if batched_train_set is None or batched_val_set is None:
-  print("run the setup script to batch the data")
+try:
+  word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name(min_occurrences))
+  batched_train_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=True))
+  batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
+except IOError:
+  print("run the setup script to create the vocab and batch the data sets")
   sys.exit()
 
 '''
@@ -91,11 +88,11 @@ optimizer = optim.Adam([
 '''
 output_train_file_name = file_namer.make_output_name(batch_size, min_occurrences, \
   num_epochs, dropout, decoder_lr, encoder_lr, embedding_dim, hidden_size, \
-  grad_clip, isTrain=True, isNormalized=isNormalized)
+  grad_clip, isNormalized=isNormalized, isTrain=True)
 output_train_file = open(output_train_file_name, 'w')
 output_val_file_name = file_namer.make_output_name(batch_size, min_occurrences, \
   num_epochs, dropout, decoder_lr, encoder_lr, embedding_dim, hidden_size, \
-  grad_clip, isTrain=False, isNormalized=isNormalized)
+  grad_clip, isNormalized=isNormalized, isTrain=False)
 output_val_file = open(output_val_file_name, 'w')
 
 index = 0
@@ -110,16 +107,6 @@ start_epoch = 0
 save_name = file_namer.make_checkpoint_name(batch_size, min_occurrences, num_epochs, dropout, \
   decoder_lr, encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized)
 checkpoint_name = file_namer.get_checkpoint(save_name)
-'''
-checkpoint_name = None
-for i in range(num_epochs, 0, -1):
-  temp = file_namer.make_checkpoint_name(batch_size, min_occurrences, i, dropout, \
-    decoder_lr, encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized)
-  if file_namer.is_checkpoint(temp):
-    checkpoint_name = temp
-    print(checkpoint_name)
-    break
-'''
 if checkpoint_name is not None:
   print("loading from checkpoint " + str(checkpoint_name))
   checkpoint = torch.load(checkpoint_name) if useCuda else torch.load(checkpoint_name, map_location=lambda storage, loc: storage)

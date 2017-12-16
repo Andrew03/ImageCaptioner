@@ -1,7 +1,5 @@
 *.pyc
 output/*.txt
-notifications/*
 *.swp
 model/*
-*.txt
 checkpoints/*

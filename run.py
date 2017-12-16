@@ -30,8 +30,9 @@ num_epochs = params[7]
 grad_clip = params[8]
 num_runs = params[9]
 beam_size = params[10]
-isNormalized = params[11]
-useCuda = params[12] and torch.cuda.is_available()
+printStepProb = params[11]
+isNormalized = params[12]
+useCuda = params[13] and torch.cuda.is_available()
 
 # defining image size
 transform = transforms.Compose([
@@ -81,7 +82,7 @@ decoder_rnn.load_state_dict(checkpoint['state_dict'])
 
 for epoch in range(num_runs):
   image, image_index, captions = evaluator.create_predict_batch(val_set, batched_val_set, useCuda)
-  prediction = evaluator.beam_search(encoder_cnn, decoder_rnn, image, beam_size, useCuda)
+  prediction = evaluator.beam_search(encoder_cnn, decoder_rnn, image, beam_size, useCuda, printStepProb)
   for caption in prediction:
     print("score is: " + str(caption[0]) + ", caption is: " + data_loader.caption_to_string(caption[1], index_to_word))
   print("actual captions are")

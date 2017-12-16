@@ -3,12 +3,12 @@ import os.path
 def make_vocab_name(min_occurrences):
   return "data/vocab/vocab_occurrence_" + str(min_occurrences) + ".txt"
 
-def make_batch_name(batch_size, min_occurrences, isTrain):
+def make_batch_name(batch_size, min_occurrences, isTrain=True):
   return "data/batched_data/" + ("train" if isTrain else "val") + \
     "_batch_" + str(batch_size) + "_occurrence_" + str(min_occurrences) + ".txt"
 
 def make_output_name(batch_size, min_occurrences, num_epochs, dropout, decoder_lr, \
-  encoder_lr, embedding_dim, hidden_size, grad_clip, isTrain, isNormalized):
+  encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized, isTrain=True):
   return "output/" + ("train" if isTrain else "val") + \
     "_batch_" + str(batch_size) + "_occurrence_" + str(min_occurrences) + \
     "_epoch_" + str(num_epochs) + "_dropout_" + str(dropout) + "_decoderLR_" + \
