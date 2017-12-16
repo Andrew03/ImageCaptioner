@@ -16,34 +16,44 @@ def create_predict_batch(training_data, batched_data, useCuda=True):
 def create_predict_input_captions(captions, useCuda=True):
   return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(captions))
 
-def beam_search(cnn, lstm, images, beam_size=1, useCuda=True):
-  lstm.eval()
+def beam_search(encoder_cnn, decoder_rnn, images, beam_size=1, useCuda=True, printStepProbs=False):
+  decoder_rnn.eval()
   #best_phrases = [[0, []] for i in range(beam_size)]
   completed_phrases = []
   index = 0
   # intializing hidden state with image
-  lstm.hidden = lstm.init_hidden(1)
-  lstm(cnn(images))
+  decoder_rnn.hidden = decoder_rnn.init_hidden(1)
+  decoder_rnn(encoder_cnn(images))
   # creating intial input batch
   input_captions = create_predict_input_captions([1], useCuda)
-  initial_scores, initial_probabilities = lstm(input_captions)
+  initial_scores, initial_probabilities = decoder_rnn(input_captions)
   # getting top scores
   top_scores, top_indices = initial_scores.topk(beam_size)
   step_score = 0
   top_probs, _ = initial_probabilities.topk(beam_size)
   for score in top_probs[0].data:
     step_score += score
-  print(step_score)
+  if printStepProbs:
+    print(str(index) + ": " + str(step_score))
   # updating best phrases
   best_phrases = [[top_scores[0].data[i], [top_indices[0].data[i]]] for i in range(beam_size)]
   # getting next batch of inputs
   next_captions = top_indices.resize(beam_size, 1)
-  lstm.hidden = (lstm.hidden[0].repeat(1, beam_size, 1), lstm.hidden[1].repeat(1, beam_size, 1))
+  decoder_rnn.hidden = (decoder_rnn.hidden[0].repeat(1, beam_size, 1), decoder_rnn.hidden[1].repeat(1, beam_size, 1))
   while index < 20:
     index += 1
-    scores, probabilities = lstm(next_captions)
+    scores, probabilities = decoder_rnn(next_captions)
     best_candidates = []
     top_scores, top_indices = scores.topk(beam_size)
+    top_probs, _ = probabilities.topk(beam_size)
+    step_scores = []
+    for i in range(len(best_phrases)):
+      step_score = 0
+      for score in top_probs[i].data:
+        step_score += score
+      step_scores.append(step_score)
+    if printStepProbs:
+      print(str(index) + ": " + str(step_scores))
     len_phrases = len(best_phrases[0][1])
     for i in range(len(best_phrases)):
       for j in range(beam_size):
@@ -60,7 +70,7 @@ def beam_search(cnn, lstm, images, beam_size=1, useCuda=True):
     best_phrases = [[phrase[0], phrase[1]] for phrase in best_candidates]
     next_captions = [[phrase[1][-1]] for phrase in best_phrases]
     next_captions = create_predict_input_captions(next_captions, useCuda)
-    lstm.hidden = (torch.stack([lstm.hidden[0][0].select(0, phrase[2]) for phrase in best_candidates]),
-      torch.stack([lstm.hidden[1][0].select(0, phrase[2]) for phrase in best_candidates]))
-    lstm.hidden = (lstm.hidden[0].unsqueeze(0), lstm.hidden[1].unsqueeze(0))
+    decoder_rnn.hidden = (torch.stack([decoder_rnn.hidden[0][0].select(0, phrase[2]) for phrase in best_candidates]),
+      torch.stack([decoder_rnn.hidden[1][0].select(0, phrase[2]) for phrase in best_candidates]))
+    decoder_rnn.hidden = (decoder_rnn.hidden[0].unsqueeze(0), decoder_rnn.hidden[1].unsqueeze(0))
   return completed_phrases + best_phrases
