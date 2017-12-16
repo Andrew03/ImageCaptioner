@@ -125,8 +125,8 @@ def load_data(images, annotations, transform):
   return datasets.CocoCaptions(root = images, annFile = annotations, transform = transform)
 
 # Needs an array of images
-def image_to_variable(image):
-  if torch.cuda.is_available():
+def image_to_variable(image, useCuda=True):
+  if torch.cuda.is_available() and useCuda:
     image = image.cuda()
   return autograd.Variable(image)
 
@@ -136,24 +136,19 @@ def create_data_batch(image_set, batched_data, word_to_index, batch_size=1, rand
   captions = []
   index = random.choice(batched_data.keys())
   data_set = batched_data[index]
-  #print(len(data_set))
   image_caption_set = random.sample(data_set, batch_size)
-  #random.shuffle(data_set)
-  #image_caption_set = data_set[0:batch_size]
   for image_caption in image_caption_set:
     image, _ = image_set[image_caption[0]]
     images.append(image)
     captions.append(image_caption[1])
   images = image_to_variable(torch.stack(images, 0))
-  #print(captions[0])
-  #print(len(captions))
   return images, captions
 
-def create_input_batch_images(image_set, image_indices):
+def create_input_batch_images(image_set, image_indices, useCuda=True):
   images = [image_set[i][0] for i in image_indices]
-  return image_to_variable(torch.stack(images, 0)) 
+  return image_to_variable(torch.stack(images, 0), useCuda) 
 
-def create_input_batch_captions(captions):
+def create_input_batch_captions(captions, useCuda=True):
   inputs = []
   for caption in captions:
     # strip the EOS token if it is there
@@ -161,7 +156,7 @@ def create_input_batch_captions(captions):
       inputs.append(caption[:-1])
     else:
       inputs.append(caption)
-  return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(inputs))
+  return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(inputs))
 
 def group_data(dataset, batch_size):
   grouped_set = []
@@ -172,15 +167,15 @@ def group_data(dataset, batch_size):
 # targets are a long vector, flatten them out
 # remember to take SOS token from targets
 # remember to go b1w1, b2,w1, b3,w1
-def create_target_batch_captions(captions):
+def create_target_batch_captions(captions, useCuda=True):
   targets = []
-  '''
   for i in range(1, len(captions[0])):
     targets.extend([captions[j][i] for j in range(len(captions))])
   '''
   for caption in captions:
     targets += caption[1:]
-  return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
+  '''
+  return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(targets))
 
 def get_index(word, word_to_index):
   return word_to_index[word] if word in word_to_index else word_to_index["UNK"]
@@ -205,3 +200,11 @@ def shuffle_data_set(batched_data_set, batch_size):
     data_set.extend(group_data(key_set, batch_size))
   random.shuffle(data_set)
   return data_set
+
+def get_all_captions(image_index, data_set):
+  captions = []
+  for key in data_set.keys():
+    for image_caption_set in data_set[key]:
+      if image_caption_set[0] == image_index:
+        captions.append(image_caption_set[1])
+  return captions
