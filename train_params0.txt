@@ -5,7 +5,7 @@ hidden_size: 512
 dropout: 0.0
 decoder_lr: 0.0001
 encoder_lr: 0.0001
-num_epochs: 15
+num_epochs: 20
 grad_clip: 5
 isNormalized: False
 useCuda: True

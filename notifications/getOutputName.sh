@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -ne 1 ]; then 
-  echo "Need to specify min_occurrences and batch size"
+  echo "Need to specify train parameter file"
   exit 0
 else
   FILES="$(python ./notifications/getOutputName.py $1)"
