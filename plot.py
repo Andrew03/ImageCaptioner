@@ -1,4 +1,5 @@
 import pylab as plt
+import matplotlib.patches as mpatches
 import csv
 import sys
 
@@ -39,10 +40,16 @@ else:
               val_loss.append(number_value[1])
               val_trial.append(number_value[0])
 
-plt.plot(train_trial, train_loss, 'ro', markersize=1)
-plt.plot(val_trial, val_loss, 'bo', markersize=3)
-plt.plot(epoch_trial, epoch_loss, 'bo', markersize=5)
-plt.xlabel('trials')
-plt.ylabel('loss')
-plt.title('loss over trials')
+# plotting the data
+plt.plot(train_trial, train_loss, 'go', markersize=1, label='Training Batch Loss')
+plt.plot(val_trial, val_loss, 'ro', markersize=3, label='Random Validation Batch Loss')
+plt.plot(epoch_trial, epoch_loss, 'bo', markersize=5, label='Validation Loss After 1 Full Epoch')
+
+# titles and axis labels
+plt.xlabel('Number of Batches')
+plt.ylabel('Loss')
+plt.title('Loss over ' + str(len(epoch_trial)) + ' Epochs')
+
+plt.legend()
+
 plt.show()
