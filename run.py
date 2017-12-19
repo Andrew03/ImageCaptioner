@@ -8,9 +8,8 @@ import data_loader
 import file_namer
 import param_parser
 import evaluator
+import model
 from nltk import bleu
-from lstm import LSTM
-from encoder import EncoderCNN
 
 '''
 ## Run Parameters
@@ -25,12 +24,15 @@ batch_size = params[1]
 embedding_dim = params[2]
 hidden_size = params[3]
 dropout = params[4]
-model_lr = params[5]
+decoder_lr = params[5]
 encoder_lr = params[6]
 num_epochs = params[7]
 grad_clip = params[8]
 num_runs = params[9]
-isNormalized = params[10]
+beam_size = params[10]
+printStepProb = params[11]
+isNormalized = params[12]
+useCuda = params[13] and torch.cuda.is_available()
 
 # defining image size
 transform = transforms.Compose([
@@ -43,7 +45,7 @@ transform = transforms.Compose([
 ])
 
 '''
-## Loading the different data sets the model uses to evaluate 
+## Loading the different data sets the decoder_rnn uses to evaluate 
 ## val_set stores the actual images and captions in word form
 ## word_to_index and index_to_word are used to store the vocabulary
 ## batched_val_set stores the batched data sets of image_indices and captions
@@ -56,35 +58,31 @@ word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name
 batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
 
 '''
-## Creating the Model
+## Creating the decoder_rnn
 ## Instantiate the encoder and lstm and loss function
 '''
-encoder_cnn = EncoderCNN(isNormalized)
-model = LSTM(embedding_dim, hidden_size, len(word_to_index), batch_size, dropout=dropout)
-if torch.cuda.is_available():
-  model.cuda()
+encoder_cnn = model.EncoderCNN(isNormalized, useCuda)
+decoder_rnn = model.DecoderRNN(embedding_dim, hidden_size, len(word_to_index), batch_size, dropout, useCuda)
+if useCuda:
+  decoder_rnn.cuda()
 loss_function = nn.NLLLoss()
 
 '''
 ## Loading Checkpoint
-## Loads the model from the checkpoint specified in run parameters
+## Loads the decoder_rnn from the checkpoint specified in run parameters
 '''
-checkpoint_name = file_namer.make_save_name(batch_size, min_occurrences, num_epochs, dropout, \
-  model_lr, encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized)
+checkpoint_name = file_namer.make_checkpoint_name(batch_size, min_occurrences, num_epochs, dropout, \
+  decoder_lr, encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized=isNormalized)
 if not os.path.isfile(checkpoint_name):
   print("Invalid run parameters!")
   print("Checkpoint " + str(checkpoint_name) + " does not exist!")
   sys.exit()
-checkpoint = torch.load(checkpoint_name)
-model.load_state_dict(checkpoint['state_dict'])
-#model.load_state_dict(torch.load(checkpoint_name))
+checkpoint = torch.load(checkpoint_name) if useCuda else torch.load(checkpoint_name, map_location=lambda storage, loc: storage)
+decoder_rnn.load_state_dict(checkpoint['state_dict'])
 
-initial_word = ""
-model.eval()
 for epoch in range(num_runs):
-  model.hidden = model.init_hidden()
-  image, image_index, captions = evaluator.create_predict_batch(val_set, batched_val_set)
-  prediction = evaluator.beam_search(encoder_cnn, model, image, beam_size=10)
+  image, image_index, captions = evaluator.create_predict_batch(val_set, batched_val_set, useCuda)
+  prediction = evaluator.beam_search(encoder_cnn, decoder_rnn, image, beam_size, useCuda, printStepProb)
   for caption in prediction:
     print("score is: " + str(caption[0]) + ", caption is: " + data_loader.caption_to_string(caption[1], index_to_word))
   print("actual captions are")

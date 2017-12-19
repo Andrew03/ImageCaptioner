@@ -1,4 +1,5 @@
 import pylab as plt
+import matplotlib.patches as mpatches
 import csv
 import sys
 
@@ -14,41 +15,41 @@ if len(sys.argv) == 1:
 elif len(sys.argv) == 2:
   with open(sys.argv[1],'r') as file:
     trial_number = 0
-    index = 0
     for line in file:
       number_value = line.split(",")
       train_loss.append(number_value[1])
       train_trial.append(number_value[0])
-elif len(sys.argv) == 3:
-  with open(sys.argv[1],'r') as file:
-    index = 0
-    for line in file:
-      number_value = line.split(",")
-      train_loss.append(number_value[1])
-      train_trial.append(number_value[0])
-  with open(sys.argv[2],'r') as file:
-    index = 0
-    endOfEpoch = False
-    for line in file:
-      if endOfEpoch == True:
+else:
+  for i in range(1, len(sys.argv)):
+    with open(sys.argv[i], 'r') as file:
+      endOfEpoch = False
+      for line in file:
         number_value = line.split(",")
-        epoch_loss.append(number_value[1])
-        epoch_trial.append(number_value[0])
-        endOfEpoch = False
-      else:
-        number_value = line.split(",")
-        if len(number_value) == 1:
-          endOfEpoch = True
+        if i < (len(sys.argv) + 1) / 2:
+          train_loss.append(number_value[1])
+          train_trial.append(number_value[0])
         else:
-          val_loss.append(number_value[1])
-          val_trial.append(number_value[0])
+          if endOfEpoch == True:
+            epoch_loss.append(number_value[1])
+            epoch_trial.append(number_value[0])
+            endOfEpoch = False
+          else:
+            if len(number_value) == 1:
+              endOfEpoch = True
+            else:
+              val_loss.append(number_value[1])
+              val_trial.append(number_value[0])
 
-plt.plot(train_trial, train_loss, 'ro', markerSize=1)
-plt.plot(val_trial, val_loss, 'bo', markerSize=5)
-plt.plot(epoch_trial, epoch_loss, 'bo', markerSize=10)
-plt.xlabel('trials')
-plt.ylabel('loss')
-plt.title('loss over trials')
+# plotting the data
+plt.plot(train_trial, train_loss, 'go', markersize=1, label='Training Batch Loss')
+plt.plot(val_trial, val_loss, 'ro', markersize=3, label='Random Validation Batch Loss')
+plt.plot(epoch_trial, epoch_loss, 'bo', markersize=5, label='Validation Loss After 1 Full Epoch')
+
+# titles and axis labels
+plt.xlabel('Number of Batches')
+plt.ylabel('Loss')
+plt.title('Loss over ' + str(len(epoch_trial)) + ' Epochs')
+
+plt.legend()
+
 plt.show()
-
-

@@ -1,3 +1,6 @@
+"""
+Consists of functions for loading and manipulating data
+"""
 import torch
 import torch.autograd as autograd
 import torchvision.datasets as datasets
@@ -9,47 +12,53 @@ import sys
 import string
 from random import randint
 
-def get_file_information():
-  image_dir = ""
-  annotation_dir = ""
-  while os.path.isdir(image_dir) == False:
-    print "image directory:",
-    image_dir = raw_input()
-  while os.path.isfile(annotation_dir) == False:
-    print "annotation directory:",
-    annotation_dir = raw_input()
-  build_vocab = os.path.isfile("vocab.txt") == False
-  if build_vocab == False:
-    vocab_input = ""
-    while vocab_input != "y" and vocab_input != "n":
-      print "rebuild vocabulary? (y/n)",
-      vocab_input = raw_input()
-    build_vocab = (vocab_input == "y")
-  return image_dir, annotation_dir, build_vocab
-
 def load_vocab(file_name):
-  if os.path.isfile(file_name) == True:
-    vocab_file = open(file_name, 'r')
-    index_to_word = vocab_file.read().splitlines()
-    vocab_file.close()
-    word_to_index = {}
-    index = 0
-    for word in index_to_word:
-      word_to_index[word] = index
-      index += 1
-    return word_to_index, index_to_word
-  else:
-    return [None, None]
+  """
+  Loads the vocabulary
+  Args:
+    file_name: The name of the vocabularly file
+  Returns:         
+    List containing a word_to_index dictionary and a index_to_word list
+  Raises:
+    IOError: File does not exist
+  """
+  if not os.path.isfile(file_name):
+    raise IOError("File <" + file_name + "> does not exist")
+  vocab_file = open(file_name, 'r')
+  index_to_word = vocab_file.read().splitlines()
+  vocab_file.close()
+  word_to_index = {}
+  index = 0
+  for word in index_to_word:
+    word_to_index[word] = index
+    index += 1
+  return word_to_index, index_to_word
 
-# input the vocab that contains the words, i.e index_to_word
 def write_vocab_to_file(vocab, file_name):
+  """
+  Writes the vocabulary to a file
+  Args:
+    vocab: The index_to_word list mapping an index to a word
+    file_name: The name of the file to write the vocabulary to
+  """
   vocab_file = open(file_name, 'w')
   for word in vocab:
     vocab_file.write(word + "\n")
   vocab_file.close()
 
-# assumes that data is in form of a two tuple, with captions as the second
 def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_of_seq_val=2):
+  """
+  Creates a vocabulary from the inputted data
+  Args:
+    data: The data to build the vocabulary from in the form of a list of tuples, where
+          the caption is the second value in the tuple
+    min_occurrence: The minimum number of times a word must appear to be included
+    unknown_val: The integer to use to represent unknown words
+    end_of_seq_val: The integer to use to represent the end of a sequence
+    start_of_seq_val: The integer used to represent the start of a sequence
+  Returns:
+    List containing a word_to_index dictionary and a index_to_word list
+  """
   word_to_index = {}
   index_to_word = []
   word_to_appearences = {}
@@ -59,10 +68,7 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_
   index_to_word.append("SOS")
   word_to_index["EOS"] = start_of_seq_val
   index_to_word.append("EOS")
-  iter_number = 0
   for _, captions in data:
-    if iter_number % 1000 == 0 and iter_number > 999:
-      print iter_number
     for sentence in captions:
       for word in split_sentence(sentence):
         if word not in word_to_appearences:
@@ -71,28 +77,45 @@ def create_vocab(data, min_occurrence=1, unknown_val=0, end_of_seq_val=1, start_
         if word_to_appearences[word] == min_occurrence:
           word_to_index[word] = len(index_to_word)
           index_to_word.append(word)
-    iter_number += 1
   return word_to_index, index_to_word
 
 def load_batched_data(file_name):
-  if os.path.isfile(file_name) == True:
-    batched_data = {}
-    data_file = open(file_name, 'r')
-    num_keys = int(data_file.readline())
-    for _ in range(num_keys):
-      key = int(data_file.readline())
-      num_caps = int(data_file.readline())
-      batched_data[key] = []
-      for _ in range(num_caps):
-        image = int(data_file.readline())
-        caption = data_file.readline().split(',')
-        caption = [int(i) for i in caption[:-1]]
-        batched_data[key].append([image, caption])
-    return batched_data
-  else:
-    return None
+  """
+  Loads the batched data set
+  Args:
+    file_name: The name of the file containing the batched data
+  Returns:
+    A dictionary containing the length of sequences as keys and a list of
+    sequences of that length as values
+    The sequences are integers made using the corresponding vocabulary
+  Raises:
+    IOError: File does not exist
+  """
+  if not os.path.isfile(file_name):
+    raise IOError("File <" + file_name + "> does not exist")
+  batched_data = {}
+  data_file = open(file_name, 'r')
+  num_keys = int(data_file.readline())
+  for _ in range(num_keys):
+    key = int(data_file.readline())
+    num_caps = int(data_file.readline())
+    batched_data[key] = []
+    for _ in range(num_caps):
+      image = int(data_file.readline())
+      caption = data_file.readline().split(',')
+      caption = [int(i) for i in caption[:-1]]
+      batched_data[key].append([image, caption])
+  return batched_data
 
 def write_batched_data(batched_data, file_name):
+  """
+  Writes the batched data set to a file
+  Args:
+    batched_data: The batched data set, a dictionary containing the length of sequences
+                  as keys and a list of sequences of that length as values
+                  The sequences are integers made using the corresponding vocabulary
+    file_name: The name of the file to write the batched data set to
+  """
   data_file = open(file_name, 'w')
   data_file.write(str(len(batched_data)) + "\n")
   for key in batched_data.keys():
@@ -106,6 +129,19 @@ def write_batched_data(batched_data, file_name):
   data_file.close()
 
 def batch_data(data_set, word_to_index, batch_size=1):
+  """
+  Creates a batched data set from an unbatched data set
+  Args:
+    data_set: The data set to build the batched data set from, comes in the form of
+              a list of tuples, where the caption is the second value in the tuple
+    word_to_index: The vocabulary, a list containing index to word mappings
+    batch_size: The minimum number of times a caption of the same length must appear
+                for it to be included in the batched data set
+  Returns:
+    A dictionary containing the length of sequences as keys and a list of
+    sequences of that length as values
+    The sequences are integers made using the corresponding vocabulary
+  """
   batched_set = {}
   for i in range(len(data_set)):
     image, captions = data_set[i]
@@ -122,13 +158,31 @@ def batch_data(data_set, word_to_index, batch_size=1):
   return batched_set
 
 def load_data(images, annotations, transform):
+  """
+  Loads a data set using the MSCoCo API
+  Args:
+    images: The directory containing the images of the data set
+    annotations: The directory containing the annotations of the data set
+    transform: The transformation to be applied onto the images
+  Returns: 
+    The data set in the form of a list of tuples, where the image is the first value and
+    the caption is the second value in the tuple
+  """
   return datasets.CocoCaptions(root = images, annFile = annotations, transform = transform)
 
-# Needs an array of images
-def image_to_variable(image):
-  if torch.cuda.is_available():
-    image = image.cuda()
-  return autograd.Variable(image)
+def image_to_variable(images, useCuda=True):
+  """
+  Converts a list of images into a Variable object
+  Args:
+    images: A list of images (to convert a single image,
+            pass in a list containing just that image) 
+    useCuda: If True, returns a cuda Variable, otherwise returns a non-cuda Variable
+  Returns:
+    A Variable containing the images
+  """
+  if torch.cuda.is_available() and useCuda:
+    images = images.cuda()
+  return autograd.Variable(images)
 
 # returns images in a stored tensor, captions are just in a list, need to format to input or output manually
 def create_data_batch(image_set, batched_data, word_to_index, batch_size=1, randomize=False):
@@ -136,24 +190,19 @@ def create_data_batch(image_set, batched_data, word_to_index, batch_size=1, rand
   captions = []
   index = random.choice(batched_data.keys())
   data_set = batched_data[index]
-  #print(len(data_set))
   image_caption_set = random.sample(data_set, batch_size)
-  #random.shuffle(data_set)
-  #image_caption_set = data_set[0:batch_size]
   for image_caption in image_caption_set:
     image, _ = image_set[image_caption[0]]
     images.append(image)
     captions.append(image_caption[1])
   images = image_to_variable(torch.stack(images, 0))
-  #print(captions[0])
-  #print(len(captions))
   return images, captions
 
-def create_input_batch_images(image_set, image_indices):
+def create_input_batch_images(image_set, image_indices, useCuda=True):
   images = [image_set[i][0] for i in image_indices]
-  return image_to_variable(torch.stack(images, 0)) 
+  return image_to_variable(torch.stack(images, 0), useCuda) 
 
-def create_input_batch_captions(captions):
+def create_input_batch_captions(captions, useCuda=True):
   inputs = []
   for caption in captions:
     # strip the EOS token if it is there
@@ -161,36 +210,73 @@ def create_input_batch_captions(captions):
       inputs.append(caption[:-1])
     else:
       inputs.append(caption)
-  return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(inputs))
+  return autograd.Variable(torch.cuda.LongTensor(inputs)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(inputs))
 
 def group_data(dataset, batch_size):
+  """
+  Takes a list of images and captions and makes a list where each element is a batch
+  of batch_size elements from the dataset
+  Args:
+    dataset: A list of images indices and captions where each caption has the same length
+    batch_size: The number of dataset elements in each element of the output list
+  Returns:
+    A list containing lists of batch_size elements from the dataset
+  """
   grouped_set = []
   for i in range(len(dataset) / batch_size - 1):
     grouped_set.append(dataset[i * batch_size : (i + 1) * batch_size])
   return grouped_set
 
-# targets are a long vector, flatten them out
-# remember to take SOS token from targets
-# remember to go b1w1, b2,w1, b3,w1
-def create_target_batch_captions(captions):
+def create_target_batch_captions(captions, useCuda=True):
+  """
+  Takes a list of captions and flattens them out into a single long Variable of targets
+  The targets are returned in the form b1w1, b2w1, b3w1,...
+  Args:
+    captions: A list of lists of integers that represent a list of captions
+    useCuda: If True, loads the Variable onto the GPU
+  Returns:
+    A single long Variable of targets in the form b1w1, b2w1, b3w1, ...
+  """
   targets = []
-  '''
+  # getting rid of the SOS token
   for i in range(1, len(captions[0])):
     targets.extend([captions[j][i] for j in range(len(captions))])
-  '''
-  for caption in captions:
-    targets += caption[1:]
-  return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() else autograd.Variable(torch.LongTensor(targets))
+  return autograd.Variable(torch.cuda.LongTensor(targets)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(targets))
 
 def get_index(word, word_to_index):
+  """
+  Gets the integer representation of the given word, or returns the UNK index
+  if the given word is not in the vocabulary
+  Args:
+    word: The word to find the integer representation of
+    word_to_index: The dictionary containing a mapping of words to integer representations
+  Returns:
+    The integer representation of a word, or the UNK index if the given word
+    is not in the vocabulary (word_to_index)
+  """
   return word_to_index[word] if word in word_to_index else word_to_index["UNK"]
 
 def split_sentence(sentence):
+  """
+  Strips a unicode string of punctuation and returns a list of the words in lowercase
+  Args:
+    sentence: A unicode string
+  Returns:
+    A list of the words of the string, lowercased, stripped of punctuation
+  """
   remove_punctuation_map = dict((ord(char), None) for char in string.punctuation)
   sentence = sentence.translate(remove_punctuation_map)
   return re.findall(r"[\w']+|[.,!?;]", sentence.lower())
 
 def caption_to_string(caption, index_to_word):
+  """
+  Takes a list of integer representations of words and returns 
+  a string composed of the words from the list
+  Args:
+    sentence: A list of integer representations of words
+  Returns:
+    A string of the words represented in the input list
+  """
   string_rep = ""
   for word in caption:
     if word != 1 and word != 2:
@@ -198,6 +284,20 @@ def caption_to_string(caption, index_to_word):
   return string_rep[:-1]
 
 def shuffle_data_set(batched_data_set, batch_size):
+  """
+  Takes in a batched data set and returns a list consisting of batches of batch size
+  where each batch contains image caption sets of the same length
+  Args:
+    batched_data_set: A batched data set in the form of a dictionary where the keys
+                      are the lengths of captions and the values are lists of 
+                      image indices and lists of caption integer representations
+                      of the same length
+    batch_size: The size of each element in the return list
+  Returns:
+    A list where each element in the list consists of batch_size elements of
+    lists of image indices and lists of caption integer representations of the
+    same length
+  """
   data_set = []
   keys = batched_data_set.keys()
   for key in random.sample(keys, len(keys)):
@@ -205,3 +305,19 @@ def shuffle_data_set(batched_data_set, batch_size):
     data_set.extend(group_data(key_set, batch_size))
   random.shuffle(data_set)
   return data_set
+
+def get_all_captions(image_index, data_set):
+  """
+  Gets all the caption associated with a certain image in string form
+  Args:
+    image_index: The index of the image in the data set
+    data_set: The data set containing the image
+  Returns:
+    A list of all the captions associated with the image in string form
+  """
+  captions = []
+  for key in data_set.keys():
+    for image_caption_set in data_set[key]:
+      if image_caption_set[0] == image_index:
+        captions.append(image_caption_set[1])
+  return captions
