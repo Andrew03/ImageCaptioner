@@ -3,9 +3,20 @@ import os.path
 def make_vocab_name(min_occurrences):
   return "data/vocab/vocab_occurrence_" + str(min_occurrences) + ".txt"
 
+def make_vocab_name_pkl(min_occurrences):
+  return "data/vocab/vocab_occurrence_" + str(min_occurrences) + ".pkl"
+
 def make_batch_name(batch_size, min_occurrences, isTrain=True):
   return "data/batched_data/" + ("train" if isTrain else "val") + \
     "_batch_" + str(batch_size) + "_occurrence_" + str(min_occurrences) + ".txt"
+    
+def make_batch_name_pkl(batch_size, size=None, isTrain=True):
+  name = "data/batched_data/" + ("train" if isTrain else "val") + "_batch_" + str(batch_size)
+  if size is not None:
+    name += "_size_" + str(size) + ".pkl"
+  else:
+    name += ".pkl"
+  return name
 
 def make_output_name(batch_size, min_occurrences, num_epochs, dropout, decoder_lr, \
   encoder_lr, embedding_dim, hidden_size, grad_clip, isNormalized, isTrain=True):

@@ -9,7 +9,7 @@ import file_namer
 import param_parser
 import evaluator
 import model
-from nltk import bleu
+#from nltk import bleu
 
 '''
 ## Run Parameters
@@ -51,11 +51,13 @@ transform = transforms.Compose([
 ## batched_val_set stores the batched data sets of image_indices and captions
 '''
 # loading the data sets
-val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
+#val_set = data_loader.load_data(images='data/val2014', annotations='data/annotations/captions_val2014.json', transform=transform)
+val_set = data_loader.load_data(images='data/train2014', annotations='data/annotations/captions_train2014.json', transform=transform)
 # loads the vocabulary
 word_to_index, index_to_word = data_loader.load_vocab(file_namer.make_vocab_name(min_occurrences))
 # loads the batched data
-batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
+#batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=False))
+batched_val_set = data_loader.load_batched_data(file_namer.make_batch_name(batch_size, min_occurrences, isTrain=True))
 
 '''
 ## Creating the decoder_rnn
@@ -80,6 +82,7 @@ if not os.path.isfile(checkpoint_name):
 checkpoint = torch.load(checkpoint_name) if useCuda else torch.load(checkpoint_name, map_location=lambda storage, loc: storage)
 decoder_rnn.load_state_dict(checkpoint['state_dict'])
 
+#sys.exit()
 for epoch in range(num_runs):
   image, image_index, captions = evaluator.create_predict_batch(val_set, batched_val_set, useCuda)
   prediction = evaluator.beam_search(encoder_cnn, decoder_rnn, image, beam_size, useCuda, printStepProb)

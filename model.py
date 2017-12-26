@@ -14,6 +14,8 @@ class EncoderCNN(nn.Module):
       self.vgg16.cuda()
     # removing clasification layer
     del(self.vgg16.classifier._modules['6'])
+    for param in self.vgg16.parameters():
+      param.requires_grad = False
 
   def forward(self, images):
     return self.vgg16(images).unsqueeze(0)
@@ -49,4 +51,4 @@ class DecoderRNN(nn.Module):
       embed_value.view(len(batch[0]), len(batch), self.embedding_dim), self.hidden) if is_word else self.lstm(embed_value)
     lstm_out = self.dropout(lstm_out)
     words_space = self.hidden2word(lstm_out.view(-1, self.hidden_dim))
-    return F.log_softmax(words_space), F.softmax(words_space)
+    return F.log_softmax(words_space, dim=1), F.softmax(words_space, dim=1)
