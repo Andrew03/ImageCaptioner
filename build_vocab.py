@@ -1,5 +1,5 @@
 import nltk
-import cPickle
+import pickle
 import argparse
 from collections import Counter
 from pycocotools.coco import COCO
@@ -19,9 +19,12 @@ class Vocabulary(object):
       self.index += 1
 
   def __call__(self, word):
-    if not word in self.word_to_index:
-      return self.word_to_index['<UNK>']
-    return self.word_to_index[word]
+    if type(word) == str:
+      if not word in self.word_to_index:
+        return self.word_to_index['<UNK>']
+      return self.word_to_index[word]
+    else:
+      return self.index_to_word[word]
 
   def __len__(self):
     return self.index
@@ -58,7 +61,7 @@ def main(args):
                       min_occurrences=args.min_occurrences)
   save_path = args.save_path if args.save_path != "" else make_vocab_name_pkl(args.min_occurrences)
   with open(save_path, 'wb') as f:
-    cPickle.dump(vocab, f)
+    pickle.dump(vocab, f)
   print("Total vocabulary size: %d" %len(vocab))
   print("Saved the vocabulary at '%s'" %save_path)
 

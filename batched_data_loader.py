@@ -2,7 +2,6 @@ import torch
 import torchvision.transforms as transforms
 import torch.utils.data as data
 import os
-import cPickle
 import nltk
 from PIL import Image
 from build_vocab import Vocabulary
@@ -19,6 +18,7 @@ class BatchedCocoDataset(data.Dataset):
   def __getitem__(self, index):
     images = []
     captions = []
+    img_ids = []
     for ann_id in self.batched_captions(index):
       caption = self.coco.anns[ann_id]['caption']
       img_id = self.coco.anns[ann_id]['image_id']
@@ -32,16 +32,15 @@ class BatchedCocoDataset(data.Dataset):
       tokens = nltk.tokenize.word_tokenize(str(caption).lower())
       caption = [self.vocab('<SOS>')] + [self.vocab(token) for token in tokens] + [self.vocab('<EOS>')]
       captions.append(caption)
-    return torch.stack(images, 0), torch.LongTensor(captions)
+      img_ids.append(img_id)
+    return torch.stack(images, 0), torch.LongTensor(captions), img_ids
 
   def __len__(self):
     return len(self.batched_captions)
 
 def collate_fn(data):
-  images, captions = zip(*data)
-  caption_length = len(captions[0][0])
-  lengths = [len(caption) for caption in captions[0]]
-  return images[0], captions[0], lengths
+  images, captions, img_ids = zip(*data)
+  return images[0], captions[0], img_ids[0]
 
 def get_loader(image_path, caption_path, batched_captions, vocab, transform, shuffle, num_workers):
   dataset = BatchedCocoDataset(image_path=image_path,

@@ -1,5 +1,5 @@
 import nltk
-import cPickle
+import pickle
 import argparse
 import random
 from collections import Counter
@@ -52,6 +52,7 @@ def batch_data(caption_path, batch_size):
         if args.max_size is None or curr_size < args.max_size:
           batched_data.add_batch(batch[batch_size * j : batch_size * (j+1)])
           curr_size += 1
+  random.shuffle(batched_data.batched_data)
   return batched_data
 
 def main(args):
@@ -59,7 +60,7 @@ def main(args):
                            batch_size=args.batch_size)
   save_path = args.save_path if args.save_path != "" else make_batch_name_pkl(args.batch_size, args.max_size, not args.is_val)
   with open(save_path, 'wb') as f:
-    cPickle.dump(batched_data, f)
+    pickle.dump(batched_data, f)
   print("Total batched data set size: %d" %len(batched_data))
   print("Saved the batched data set at '%s'" %save_path)
 

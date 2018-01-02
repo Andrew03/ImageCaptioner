@@ -3,13 +3,14 @@ import torch.autograd as autograd
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
 import data_loader
+import sys
 
 def to_var(x, useCuda=True, volatile=False):
   if torch.cuda.is_available() and useCuda:
     x = x.cuda()
   return autograd.Variable(x, volatile=volatile)
 
-def train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, lengths, grad_clip, useCuda):
+def train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, grad_clip, useCuda):
   encoder_cnn.eval()
   decoder_rnn.train()
   decoder_rnn.zero_grad()
@@ -17,10 +18,11 @@ def train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, 
 
   input_images = to_var(images, useCuda, volatile=True)
   # stripping away the <EOS> token from inputs
-  input_captions = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(lengths[0] - 1)])), useCuda)
+  len_caption = len(captions[0])
+  input_captions = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(len_caption - 1)])), useCuda)
   # stripping away the <SOS> token from targets
-  targets = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(1, lengths[0])])), useCuda)
-  target_captions = pack_padded_sequence(targets, lengths, batch_first=True)[0]
+  targets = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(1, len_caption)])), useCuda)
+  target_captions = pack_padded_sequence(targets, [len_caption for i in range(len(captions))], batch_first=True)[0]
 
   # initializing decoder hidden state with image
   decoder_rnn(autograd.Variable(encoder_cnn(input_images).data))

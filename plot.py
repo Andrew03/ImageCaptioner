@@ -1,4 +1,5 @@
 import pylab as plt
+plt.switch_backend('agg')
 import matplotlib.patches as mpatches
 import csv
 import sys

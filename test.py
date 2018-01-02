@@ -5,19 +5,32 @@ import torchvision.transforms as transforms
 import torch.autograd as autograd
 import cPickle
 import argparse
-import sys
+import os
 import smtplib
 import getpass
+import torch.multiprocessing as mp
 import model
 import trainer
 import evaluator
 import file_namer
 from tqdm import tqdm
+tqdm.monitor_interval = 0
 from build_vocab import Vocabulary
 from batch_data import BatchedData
 from batched_data_loader import get_loader
 from plot import plot
 from send_email import send_email
+
+def validate(random_val_loader, encoder_cnn, decoder_rnn, loss_function, useCuda, output_val_file):
+  val_sum_loss = 0
+  for j, (val_images, val_captions, _) in enumerate(random_val_loader, 1):
+    tqdm.write("run number " + str(j))
+    val_sum_loss += evaluator.evaluate(encoder_cnn, decoder_rnn, loss_function, val_images, val_captions, useCuda)
+    if j == 1000:
+      break
+  output_val_file.write("%d, %5.4f\n" %(epoch * len(batched_train_loader) + i, val_sum_loss / 100))
+  os._exit(0)
+
 
 def main(args):
   # defining image size
@@ -54,10 +67,6 @@ def main(args):
 
   output_train_file = open(args.output_train_name, 'w')
   output_val_file = open(args.output_val_name, 'w')
-  output_train_file.write("0, 10\n")
-  output_val_file.write("0, 20\n")
-
-  start_index = 0
   start_epoch = 0
 
   save_name = file_namer.make_checkpoint_name(args.batch_size, args.min_occurrences, args.num_epochs, \
@@ -68,40 +77,58 @@ def main(args):
     print("loading from checkpoint " + checkpoint_name)
     checkpoint = torch.load(checkpoint_name) if useCuda else torch.load(checkpoint_name, map_location=lambda storage, loc: storage)
     start_epoch = checkpoint['epoch']
-    start_index = checkpoint['index']
     decoder_rnn.load_state_dict(checkpoint['state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer'])
     args.load_checkpoint = checkpoint_name
+    checkpoint = None 
+    torch.cuda.empty_cache()
   else:
     print("No existing checkpoints, starting from scratch")
     args.load_checkpoint = "No checkpoint found"
 
   for epoch in range(start_epoch, args.num_epochs):
-    train_progress_bar = tqdm(batched_train_loader)
-    train_progress_bar.set_description('Epoch [%i/%i] (Train)' %(epoch, args.num_epochs))
+    #val_processes = []
+    train_progress_bar = tqdm(iterable=batched_train_loader, desc='Epoch [%i/%i] (Train)' %(epoch, args.num_epochs))
     train_sum_loss = 0
-    for i, (images, captions, lengths) in enumerate(train_progress_bar):
-      train_sum_loss += trainer.train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, lengths, args.grad_clip, useCuda)
+    for i, (images, captions, _) in enumerate(train_progress_bar):
+      train_sum_loss += trainer.train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, args.grad_clip, useCuda)
       train_progress_bar.set_postfix(loss = train_sum_loss / ((i % 100) + 1))
-      if i % 100 == 0 and i > 99:
-        output_train_file.write("%d, %5.4f\n" %(start_index + i, train_sum_loss / 100))
-        if i % 1000 == 0 and i > 999:
+      if i % 100 == 0:
+        output_train_file.write("%d, %5.4f\n" %(epoch * len(batched_train_loader) + i, train_sum_loss / 100 if i > 0 else train_sum_loss))
+        if i % 1000 == 0:
+          """
+          newpid = os.fork()
+          if newpid == 0:
+            validate(random_val_loader, encoder_cnn, decoder_rnn.copy(), loss_function, useCuda, output_val_file)
+          """
+          """
+          if val_processes:
+            val_processes[-1].join()
+          val_processes.append(mp.Process(target=validate, args=(random_val_loader, encoder_cnn, decoder_rnn.copy(), loss_function, useCuda, output_val_file)))
+          val_processes[-1].start()
+          """
           val_sum_loss = 0
-          for j, (val_images, val_captions, val_lengths) in enumerate(random_val_loader):
-            val_sum_loss += evaluator.evaluate(encoder_cnn, decoder_rnn, loss_function, val_images, val_captions, val_lengths, useCuda)
-            if j == 999:
+          train_progress_bar.set_description('Epoch [%i/%i] (Train/Val)' %(epoch, args.num_epochs))
+          for j, (val_images, val_captions, _) in enumerate(random_val_loader, 1):
+            val_sum_loss += evaluator.evaluate(encoder_cnn, decoder_rnn, loss_function, val_images, val_captions, useCuda)
+            train_progress_bar.set_postfix(train_loss = train_sum_loss / 100, val_loss = val_sum_loss / j, iter=j)
+            if j == 100:
+              train_progress_bar.set_description('Epoch [%i/%i] (Train)' %(epoch, args.num_epochs))
               break
-          output_val_file.write("%d, %5.4f\n" %(start_index + i, val_sum_loss / 100))
-    val_progress_bar = tqdm(batched_val_loader)
-    val_progress_bar.set_description('Epoch [%i/%i] (Val)' %(epoch, args.num_epochs))
+          output_val_file.write("%d, %5.4f\n" %(epoch * len(batched_train_loader) + i, val_sum_loss / 100))
+        train_sum_loss = 0
+    """
+    if val_processes[-1].is_alive():
+      val_processes[-1].join()
+    """
+    val_progress_bar = tqdm(iterable=batched_val_loader, desc='Epoch [%i/%i] (Val)' %(epoch, args.num_epochs))
     val_sum_loss = 0
-    for i, (images, captions, lengths) in enumerate(val_progress_bar):
-      val_sum_loss += evaluator.evaluate(encoder_cnn, decoder_rnn, loss_function, images, captions, lengths, useCuda)
-      val_progress_bar.set_postfix(loss  = val_sum_loss / (i + 1)) 
+    for i, (images, captions, _) in enumerate(val_progress_bar):
+      val_sum_loss += evaluator.evaluate(encoder_cnn, decoder_rnn, loss_function, images, captions, useCuda)
+      val_progress_bar.set_postfix(loss = val_sum_loss / i if i > 0 else 1) 
     output_val_file.write("End of Epoch\n")
-    output_val_file.write("%d, %5.4f\n" %(start_index + (epoch * len(batched_train_loader)), val_sum_loss / len(batched_val_loader)))
+    output_val_file.write("%d, %5.4f\n" %((epoch + 1) * len(batched_train_loader), val_sum_loss / len(batched_val_loader)))
     torch.save({'epoch': epoch + 1,
-                'index': start_index + index,
                 'state_dict': decoder_rnn.state_dict(),
                 'optimizer': optimizer.state_dict()},
                 file_namer.make_checkpoint_name(args.batch_size, args.min_occurrences, epoch + 1, args.dropout, \
@@ -248,10 +275,10 @@ if __name__ == '__main__':
   if args.send_email:
     args.password = getpass.getpass('Password:')
 
-  # checking to make sure email credentials are valid
-  server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-  server.ehlo()
-  server.login(args.user, args.password)
-  server.close()
+    # checking to make sure email credentials are valid
+    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+    server.ehlo()
+    server.login(args.user, args.password)
+    server.close()
 
   main(args)
