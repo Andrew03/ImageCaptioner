@@ -23,6 +23,7 @@ def train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, 
   # stripping away the <SOS> token from targets
   targets = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(1, len_caption)])), useCuda)
   target_captions = pack_padded_sequence(targets, [len_caption for i in range(len(captions))], batch_first=True)[0]
+  #print(pack_padded_sequence(targets, [len_caption for i in range(len(captions))], batch_first=True))
 
   # initializing decoder hidden state with image
   decoder_rnn(autograd.Variable(encoder_cnn(input_images).data))

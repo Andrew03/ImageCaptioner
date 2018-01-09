@@ -4,7 +4,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 import torch.autograd as autograd
 from pycocotools.coco import COCO
-import cPickle
+import pickle
 import argparse
 import sys
 import smtplib
@@ -33,32 +33,25 @@ def main(args):
   useCuda = not args.disable_cuda
 
   with open(args.vocab_path, 'rb') as f1, open(args.batched_val_path, 'rb') as f3:
-    vocab = cPickle.load(f1)
-    batched_val_set = cPickle.load(f3)
+    vocab = pickle.load(f1)
+    batched_val_set = pickle.load(f3)
 
   batched_val_loader = get_loader(args.val_image_dir, args.val_caption_path, batched_val_set, vocab, transform, shuffle=True, num_workers=2)
 
   encoder_cnn = model.EncoderCNN(args.is_normalized, useCuda=useCuda)
-  decoder_rnn = model.DecoderRNN(args.embedding_dim, args.hidden_size, len(vocab), args.batch_size, dropout=args.dropout, useCuda=useCuda)
+  decoder_rnn = model.DecoderRNN(args.embedding_dim, args.hidden_size, len(vocab), 1, useCuda=useCuda)
   if torch.cuda.is_available() and useCuda:
     decoder_rnn.cuda()
   loss_function = nn.NLLLoss()
 
-  save_name = file_namer.make_checkpoint_name(args.batch_size, args.min_occurrences, args.num_epochs, \
-    args.dropout, args.decoder_lr, args.encoder_lr, args.embedding_dim, args.hidden_size, args.grad_clip, \
-    args.is_normalized) if args.load_checkpoint == "" else args.load_checkpoint
-  checkpoint_name = file_namer.get_checkpoint(save_name)
-  if checkpoint_name is None:
-    print("Checkpoint " + str(save_name) + " does not exist!")
-    sys.exit()
-  print("loading from checkpoint " + checkpoint_name)
+  checkpoint_name = args.load_checkpoint
   checkpoint = torch.load(checkpoint_name) if useCuda else torch.load(checkpoint_name, map_location=lambda storage, loc: storage)
   decoder_rnn.load_state_dict(checkpoint['state_dict'])
   args.load_checkpoint = checkpoint_name
 
   coco_caps=COCO(args.val_caption_path)
   for i, (image, _, img_id) in enumerate(batched_val_loader):
-    if i == args.num_epochs:
+    if i == args.num_runs:
       break
     # beam search
     print("actual captions are:")
@@ -73,7 +66,7 @@ def main(args):
 def caption_to_string(caption, vocab):
   output = ""
   for value in caption:
-    output += vocab.index_to_word[value] + " "
+    output += vocab(value) + " "
   return output
 
 def to_var(x, useCuda=True, volatile=False):
@@ -83,6 +76,9 @@ def to_var(x, useCuda=True, volatile=False):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
+  parser.add_argument('--num_runs', type=int,
+                      default=10,
+                      help='Number of images to generate captions for. Default value of 10')
   parser.add_argument('-use_train', action='store_true',
                       default=False,
                       help='Set to use training set instead of validation set')
@@ -92,9 +88,6 @@ if __name__ == '__main__':
   parser.add_argument('--min_occurrences', type=int,
                       default=5,
                       help='Minimum occurrences of a word in the annotations. Default value of 5')
-  parser.add_argument('--batch_size', type=int,
-                      default=32,
-                      help='Size of a batch. Default value of 32')
   parser.add_argument('--num_epochs', type=int,
                       default=10,
                       help='Number of epochs to train for. Default value of 10')
@@ -104,18 +97,6 @@ if __name__ == '__main__':
   parser.add_argument('--hidden_size', type=int,
                       default=512,
                       help='Size of the hidden state. Default value of 512')
-  parser.add_argument('--encoder_lr', type=float,
-                      default=0.001,
-                      help='Learning rate for feature mapping layer. Default value of 0.001')
-  parser.add_argument('--decoder_lr', type=float,
-                      default=0.001,
-                      help='Learning rate for decoder. Default value of 0.001')
-  parser.add_argument('--grad_clip', type=float,
-                      default=5,
-                      help='Maximum gradient. Default value of 5')
-  parser.add_argument('--dropout', type=float,
-                      default=0.0,
-                      help='Dropout value for the decoder. Default value of 0.0')
   parser.add_argument('-is_normalized', action='store_true',
                       default=False,
                       help='Set if encoder and decoder are normalized')

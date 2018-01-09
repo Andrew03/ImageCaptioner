@@ -56,15 +56,17 @@ def beam_search(encoder_cnn, decoder_rnn, image, vocab, beam_size=1, useCuda=Tru
   for score in top_probs[0].data:
     step_score += score
   if printStepProbs:
-    print(str(index) + ": " + str(step_score))
+    print("%d, %.4f" % (index, step_score))
   # updating best phrases
   best_phrases = [[top_scores[0].data[i], [top_indices[0].data[i]]] for i in range(beam_size)]
   # getting next batch of inputs
   next_captions = top_indices.resize(beam_size, 1)
   decoder_rnn.hidden = (decoder_rnn.hidden[0].repeat(1, beam_size, 1), decoder_rnn.hidden[1].repeat(1, beam_size, 1))
   while index < 20:
-    #if raw_input('continue? ') != 'y':
-    #  continue
+    """
+    if raw_input('continue? ') != 'y':
+      continue
+    """
     index += 1
     scores, probabilities = decoder_rnn(next_captions)
     best_candidates = []
@@ -77,38 +79,25 @@ def beam_search(encoder_cnn, decoder_rnn, image, vocab, beam_size=1, useCuda=Tru
         step_score += score
       step_scores.append(step_score)
     if printStepProbs:
-      print(str(index) + ": " + str(step_scores))
+      print(str(index) + ": " + str(["%.4f" % x for x in step_scores]))
     len_phrases = len(best_phrases[0][1])
     for i in range(len(best_phrases)):
       for j in range(beam_size):
-        """
-        best_candidates.extend([[(best_phrases[i][0] * len_phrases + top_scores[i].data[j]) / (len_phrases + 1),
-          best_phrases[i][1] + [top_indices[i].data[j]],
-          i]])
-        """
         best_candidates.extend([[best_phrases[i][0] + top_scores[i].data[j],
           best_phrases[i][1] + [top_indices[i].data[j]],
           i]])
     top_candidates = sorted(best_candidates, key=lambda score_caption: score_caption[0])[-beam_size:]
+    temp_candidates = []
     for phrase in top_candidates:
       if phrase[1][-1] == vocab("<EOS>"):
-        #completed_phrases.append([phrase[0], phrase[1]])
         completed_phrases.append([phrase[0] / len(phrase[1]), phrase[1]])
-        top_candidates.remove(phrase)
+      else:
+        temp_candidates.append(phrase)
+    top_candidates = temp_candidates
     if len(completed_phrases) >= beam_size:
-      return completed_phrases
+      return sorted(completed_phrases, key=lambda score_caption: score_caption[0], reverse=True)[:beam_size]
     best_phrases = [[phrase[0], phrase[1]] for phrase in top_candidates]
     next_captions = create_predict_input_captions([[phrase[1][-1]] for phrase in top_candidates], useCuda)
     decoder_rnn.hidden = (torch.stack([decoder_rnn.hidden[0][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0),
       torch.stack([decoder_rnn.hidden[1][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0))
-    """
-    print("best candidates are:")
-    for phrase in top_candidates:
-      print([vocab(x) + " " for x in phrase[1]])
-    if completed_phrases:
-      print("completed phrases are:")
-      for phrase in completed_phrases:
-        print([vocab(x) + " " for x in phrase[1]])
-    """
-
-  return completed_phrases + best_phrases
+  return sorted(completed_phrases, key=lambda score_caption: score_caption[0], reverse=True)[:beam_size]

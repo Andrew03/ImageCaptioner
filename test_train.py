@@ -59,9 +59,9 @@ def main(args):
     batched_train_set = pickle.load(f2)
     batched_val_set = pickle.load(f3)
 
-  batched_train_loader = get_loader(args.train_image_dir, args.train_caption_path, batched_train_set, vocab, transform, shuffle=True, num_workers=2)
-  batched_val_loader = get_loader(args.val_image_dir, args.val_caption_path, batched_val_set, vocab, transform, shuffle=True, num_workers=2)
-  random_val_loader = get_loader(args.val_image_dir, args.val_caption_path, batched_val_set, vocab, transform, shuffle=True, num_workers=2)
+  batched_train_loader = get_loader(args.train_image_dir, args.train_caption_path, batched_train_set, vocab, transform, shuffle=True, num_workers=3)
+  batched_val_loader = get_loader(args.val_image_dir, args.val_caption_path, batched_val_set, vocab, transform, shuffle=True, num_workers=1)
+  random_val_loader = get_loader(args.val_image_dir, args.val_caption_path, batched_val_set, vocab, transform, shuffle=True, num_workers=1)
 
   encoder_cnn = model.EncoderCNN(args.is_normalized, useCuda=useCuda)
   decoder_rnn = model.DecoderRNN(args.embedding_dim, args.hidden_size, len(vocab), args.batch_size, dropout=args.dropout, useCuda=useCuda)
@@ -98,9 +98,9 @@ def main(args):
 
   full_return_index = mp.Value('i', 0)
   full_return_value = mp.Value('d', 0.0)
-  full_val_processes = []
+  full_val_processes = None
   for epoch in range(start_epoch, args.num_epochs):
-    val_processes = []
+    val_processes = None
     return_index = mp.Value('i', 0)
     return_value = mp.Value('d', 0.0)
     train_progress_bar = tqdm(iterable=batched_train_loader, desc='Epoch [%i/%i] (Train)' %(epoch, args.num_epochs))
@@ -111,31 +111,18 @@ def main(args):
       if i % 100 == 0:
         output_train_file.write("%d, %5.4f\n" %(epoch * len(batched_train_loader) + i, train_sum_loss / 100 if i > 0 else train_sum_loss))
         if i % 1000 == 0:
-          if val_processes:
-            val_processes[-1].join()
+          if val_processes is not None:
+            val_processes.join()
             output_val_file.write("%d, %5.4f\n" %(return_index.value, return_value.value))
-            del val_processes[-1]
-          p = mp.Process(target=validate, args=(random_val_loader, encoder_cnn, decoder_rnn, loss_function, useCuda, epoch * len(batched_train_loader) + i, return_index, return_value))
-          p.start()
-          val_processes.append(p)
-          """
-          val_sum_loss = 0
-          for j, (val_images, val_captions, _) in enumerate(random_val_loader, 1):
-            val_sum_loss += evaluator.evaluate(encoder_cnn, decoder_rnn, loss_function, val_images, val_captions, useCuda)
-            train_progress_bar.set_postfix(train_loss = train_sum_loss / 100, iter = j, val_loss = val_sum_loss / j)
-            if j == 100:
-              break
-          output_val_file.write("%d, %5.4f\n" %(epoch * len(batched_train_loader) + i, val_sum_loss / 100))
-          """
+          val_processes = mp.Process(target=validate, args=(random_val_loader, encoder_cnn, decoder_rnn, loss_function, useCuda, epoch * len(batched_train_loader) + i, return_index, return_value))
+          val_processes.start()
         train_sum_loss = 0
 
-    if full_val_processes:
-      full_val_processes[-1].join()
+    if full_val_processes is not None:
+      full_val_processes.join()
       output_val_file.write("End of Epoch\n%d, %5.4f\n" %(full_return_index.value, full_return_value.value))
-      del full_val_processes[-1]
-    p = mp.Process(target=validate_full, args=(batched_val_loader, encoder_cnn, decoder_rnn, loss_function, useCuda, epoch, args.num_epochs, len(batched_train_loader), full_return_index, full_return_value))
-    p.start()
-    full_val_processes.append(p)
+    full_val_processes = mp.Process(target=validate_full, args=(batched_val_loader, encoder_cnn, decoder_rnn, loss_function, useCuda, epoch, args.num_epochs, len(batched_train_loader), full_return_index, full_return_value))
+    full_val_processes.start()
     torch.save({'epoch': epoch + 1,
                 'state_dict': decoder_rnn.state_dict(),
                 'optimizer': optimizer.state_dict()},
@@ -294,8 +281,9 @@ if __name__ == '__main__':
     server.ehlo()
     server.login(args.user, args.password)
     server.close()
-  try:
-    main(args)
+  #try:
+  main(args)
+  """
   except:
     if args.send_email:
       f = open('arguments.txt', 'w')
@@ -318,3 +306,4 @@ if __name__ == '__main__':
       args.txt_files = []
       args.png_files = []
       send_email(args)
+    """
