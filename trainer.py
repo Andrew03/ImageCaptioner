@@ -34,6 +34,7 @@ def train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, 
   optimizer.step()
   return loss.data.select(0, 0)
 
+"""
 def train_decoder(encoder_cnn, decoder_rnn, loss_function, optimizer, image_caption_set, image_data_set, max_grad, useCuda=True):
   decoder_rnn.train()
   decoder_rnn.zero_grad()
@@ -78,3 +79,4 @@ def eval_decoder_random(encoder_cnn, decoder_rnn, loss_function, image_set, batc
   decoder_rnn(image_features)
   caption_scores, _ = decoder_rnn(input_captions)
   return loss_function(caption_scores, target_captions).data.select(0, 0)
+"""

@@ -29,12 +29,14 @@ def evaluate(encoder_cnn, decoder_rnn, loss_function, images, captions, useCuda)
   caption_scores, _ = decoder_rnn(input_captions)
   return loss_function(caption_scores, target_captions).data.select(0, 0)
 
+"""
 def create_predict_batch(training_data, batched_data, useCuda=True):
   data_set = batched_data[random.choice(batched_data.keys())]
   image_caption = data_set[randint(0, len(data_set) - 1)]
   image, caption = training_data[image_caption[0]]
   images = data_loader.image_to_variable(torch.stack([image], 0), useCuda)
   return images, image_caption[0], caption
+"""
 
 def create_predict_input_captions(captions, useCuda=True):
   return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(captions))
