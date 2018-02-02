@@ -1,2 +1,0 @@
-To run all of the tests at once, from the project directory run
-python -m unittest discover tests
