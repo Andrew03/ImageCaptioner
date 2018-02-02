@@ -43,15 +43,15 @@ def validate_full(batched_val_loader, encoder_cnn, decoder_rnn, loss_function, u
   return_value.value = val_sum_loss / len(batched_val_loader)
 
 def main(args):
-  # defining image size
-  transform = transforms.Compose([
+  transform = transforms.Compose([ 
     transforms.Resize(256),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    # PyTorch says images must be normalized like this
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    transforms.RandomCrop(224),
+    transforms.RandomHorizontalFlip(), 
+    transforms.ToTensor(), 
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], 
       std=[0.229, 0.224, 0.225])
   ])
+
   useCuda = not args.disable_cuda
 
   with open(args.vocab_path, 'rb') as f1, open(args.batched_train_path, 'rb') as f2, open(args.batched_val_path, 'rb') as f3:
@@ -68,12 +68,10 @@ def main(args):
   if torch.cuda.is_available() and useCuda:
     decoder_rnn.cuda()
   loss_function = nn.NLLLoss()
-  optimizer = optim.Adam([
-    {'params': decoder_rnn.word_embedding_layer.parameters()},
-    {'params': decoder_rnn.lstm.parameters()},
-    {'params': decoder_rnn.hidden2word.parameters()},
-    {'params': decoder_rnn.image_embedding_layer.parameters(), 'lr': args.encoder_lr},
-    ], lr=args.decoder_lr)
+  #loss_function = nn.CrossEntropyLoss()
+  params = list(decoder_rnn.parameters())
+  optimizer = optim.Adam(params, lr=args.encoder_lr)
+  #scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=1)
 
   output_train_file = open(args.output_train_name, 'w')
   output_val_file = open(args.output_val_name, 'w')
@@ -120,6 +118,7 @@ def main(args):
 
     if full_val_processes is not None:
       full_val_processes.join()
+      #scheduler.step(full_return_value.value)
       output_val_file.write("End of Epoch\n%d, %5.4f\n" %(full_return_index.value, full_return_value.value))
     full_val_processes = mp.Process(target=validate_full, args=(batched_val_loader, encoder_cnn, decoder_rnn, loss_function, useCuda, epoch, args.num_epochs, len(batched_train_loader), full_return_index, full_return_value))
     full_val_processes.start()
@@ -128,10 +127,10 @@ def main(args):
                 'optimizer': optimizer.state_dict()},
                 file_namer.make_checkpoint_name(args.batch_size, args.min_occurrences, epoch + 1, args.dropout, \
                 args.decoder_lr, args.encoder_lr, args.embedding_dim, args.hidden_size, args.grad_clip, args.is_normalized))
-  if full_val_processes:
-    full_val_processes[-1].join()
+  if full_val_processes is not None:
+    full_val_processes.join()
     output_val_file.write("End of Epoch\n%d, %5.4f\n" %(full_return_index.value, full_return_value.value))
-    del full_val_processes[-1]
+    full_val_processes = None
 
   output_train_file.close()
   output_val_file.close()
@@ -283,27 +282,3 @@ if __name__ == '__main__':
     server.close()
   #try:
   main(args)
-  """
-  except:
-    if args.send_email:
-      f = open('arguments.txt', 'w')
-      for arg in sorted(vars(args)):
-        # arguments we don't want sent in the email
-        ignore_args = ['user', 'password', 'to', 'plot_name', 'train_image_dir', 'val_image_dir',
-          'send_email', 'plot', 'plot_name', 'train_caption_path', 'val_caption_path', 'png_files',
-          'txt_files', 'disable_cuda', 'body', 'output_train_name', 'output_val_name', 'show', 'subject', 'max_batched_set_size']
-        if not arg in ignore_args:
-          f.write("%s: %s\n" %(arg, getattr(args, arg)))
-      f.close()
-      if not args.body:
-        args.body = 'arguments.txt'
-      else:
-        args.txt_files.append('arguments.txt')
-      if args.subject == 'Finished Training':
-        args.subject = 'Run failed'
-      else:
-        args.subject += ': Run failed'
-      args.txt_files = []
-      args.png_files = []
-      send_email(args)
-    """

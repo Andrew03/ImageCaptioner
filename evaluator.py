@@ -1,11 +1,9 @@
 import torch
 import torch.autograd as autograd
-import heapq
 import operator
 import random
 from random import randint
 from torch.nn.utils.rnn import pack_padded_sequence
-import data_loader
 
 def to_var(x, useCuda=True, volatile=False):
   if torch.cuda.is_available() and useCuda:
@@ -28,15 +26,6 @@ def evaluate(encoder_cnn, decoder_rnn, loss_function, images, captions, useCuda)
   decoder_rnn(autograd.Variable(encoder_cnn(input_images).data))
   caption_scores, _ = decoder_rnn(input_captions)
   return loss_function(caption_scores, target_captions).data.select(0, 0)
-
-"""
-def create_predict_batch(training_data, batched_data, useCuda=True):
-  data_set = batched_data[random.choice(batched_data.keys())]
-  image_caption = data_set[randint(0, len(data_set) - 1)]
-  image, caption = training_data[image_caption[0]]
-  images = data_loader.image_to_variable(torch.stack([image], 0), useCuda)
-  return images, image_caption[0], caption
-"""
 
 def create_predict_input_captions(captions, useCuda=True):
   return autograd.Variable(torch.cuda.LongTensor(captions)) if torch.cuda.is_available() and useCuda else autograd.Variable(torch.LongTensor(captions))
@@ -65,10 +54,6 @@ def beam_search(encoder_cnn, decoder_rnn, image, vocab, beam_size=1, useCuda=Tru
   next_captions = top_indices.resize(beam_size, 1)
   decoder_rnn.hidden = (decoder_rnn.hidden[0].repeat(1, beam_size, 1), decoder_rnn.hidden[1].repeat(1, beam_size, 1))
   while index < 20:
-    """
-    if raw_input('continue? ') != 'y':
-      continue
-    """
     index += 1
     scores, probabilities = decoder_rnn(next_captions)
     best_candidates = []
@@ -100,6 +85,8 @@ def beam_search(encoder_cnn, decoder_rnn, image, vocab, beam_size=1, useCuda=Tru
       return sorted(completed_phrases, key=lambda score_caption: score_caption[0], reverse=True)[:beam_size]
     best_phrases = [[phrase[0], phrase[1]] for phrase in top_candidates]
     next_captions = create_predict_input_captions([[phrase[1][-1]] for phrase in top_candidates], useCuda)
-    decoder_rnn.hidden = (torch.stack([decoder_rnn.hidden[0][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0),
-      torch.stack([decoder_rnn.hidden[1][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0))
+    #decoder_rnn.hidden = (torch.stack([decoder_rnn.hidden[0][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0),
+    #  torch.stack([decoder_rnn.hidden[1][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0))
+    decoder_rnn.hidden = (torch.cat((torch.stack([decoder_rnn.hidden[0][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0), torch.stack([decoder_rnn.hidden[0][1].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0)), 0),
+      torch.cat((torch.stack([decoder_rnn.hidden[1][0].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0), torch.stack([decoder_rnn.hidden[1][1].select(0, phrase[2]) for phrase in top_candidates]).unsqueeze(0)), 0))
   return sorted(completed_phrases, key=lambda score_caption: score_caption[0], reverse=True)[:beam_size]

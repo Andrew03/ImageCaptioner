@@ -1,5 +1,4 @@
 import torch
-import torchvision.transforms as transforms
 import torch.utils.data as data
 import os
 import nltk
