@@ -1,5 +1,4 @@
 import pylab as plt
-plt.switch_backend('agg')
 import matplotlib.patches as mpatches
 import csv
 import sys
@@ -20,16 +19,16 @@ def plot(args):
       with open(file_name, 'r') as file:
         for line in file:
           number_value = line.split(",")
-          train_loss.append(number_value[1])
-          train_trial.append(number_value[0])
+          train_loss.append(float(number_value[1]))
+          train_trial.append(int(number_value[0]))
     for file_name in args.val_files:
       with open(file_name, 'r') as file:
         endOfEpoch = False
         for line in file:
           number_value = line.split(",")
           if endOfEpoch == True:
-            epoch_loss.append(number_value[1])
-            epoch_trial.append(number_value[0])
+            epoch_loss.append(float(number_value[1]))
+            epoch_trial.append(int(number_value[0]))
             endOfEpoch = False
           else:
             if len(number_value) == 1:
