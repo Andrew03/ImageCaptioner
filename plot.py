@@ -34,8 +34,8 @@ def plot(args):
             if len(number_value) == 1:
               endOfEpoch = True
             else:
-              val_loss.append(number_value[1])
-              val_trial.append(number_value[0])
+              val_loss.append(float(number_value[1]))
+              val_trial.append(int(number_value[0]))
   # plotting the data
   plt.plot(train_trial, train_loss, 'go', markersize=1, label='Training Batch Loss')
   plt.plot(val_trial, val_loss, 'ro', markersize=3, label='Random Validation Batch Loss')
