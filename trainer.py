@@ -35,6 +35,6 @@ def train(encoder_cnn, decoder_rnn, loss_function, optimizer, images, captions, 
   caption_scores, _ = decoder_rnn(features, input_captions, lengths)
   loss = loss_function(caption_scores, target_captions)
   loss.backward()
-  nn.utils.clip_grad_norm(decoder_rnn.parameters(), grad_clip)
+  nn.utils.clip_grad_norm_(decoder_rnn.parameters(), grad_clip)
   optimizer.step()
-  return loss.data.select(0, 0)
+  return loss.data.item()
