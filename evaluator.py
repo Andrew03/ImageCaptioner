@@ -13,18 +13,24 @@ def to_var(x, useCuda=True, volatile=False):
 def evaluate(encoder_cnn, decoder_rnn, loss_function, images, captions, useCuda):
   encoder_cnn.eval()
   decoder_rnn.eval()
-  decoder_rnn.hidden = decoder_rnn.init_hidden()
+  #decoder_rnn.hidden = decoder_rnn.init_hidden()
 
   input_images = to_var(images, useCuda, volatile=True)
   len_caption = len(captions[0])
   # stripping away the <EOS> token from inputs
   input_captions = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(len_caption - 1)])), useCuda, volatile=True)
   # stripping away the <SOS> token from targets
-  targets = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(1, len_caption)])), useCuda, volatile=True)
+  #targets = to_var(torch.index_select(captions, 1, torch.LongTensor([i for i in range(1, len_caption)])), useCuda, volatile=True)
+  targets = to_var(captions, useCuda, volatile=True)
   target_captions = pack_padded_sequence(targets, [len_caption for i in range(len(captions))], batch_first=True)[0]
+  lengths = [len_caption for _ in range(len(captions))]
 
+  """
   decoder_rnn(autograd.Variable(encoder_cnn(input_images).data))
   caption_scores, _ = decoder_rnn(input_captions)
+  """
+  features = autograd.Variable(encoder_cnn(input_images).data)
+  caption_scores, _ = decoder_rnn(features, input_captions, lengths)
   return loss_function(caption_scores, target_captions).data.select(0, 0)
 
 def create_predict_input_captions(captions, useCuda=True):
@@ -63,6 +69,7 @@ def beam_search(encoder_cnn, decoder_rnn, image, vocab, beam_size=1, useCuda=Tru
     for i in range(len(best_phrases)):
       step_score = 0
       for score in top_probs[i].data:
+        print("step_score: " + str(score))
         step_score += score
       step_scores.append(step_score)
     if printStepProbs:
